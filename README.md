@@ -28,7 +28,7 @@ Marketin Laravel Bridge is a lightweight helper that drops the Marketin JavaScri
 ## Features
 
 - One-line Blade directive (`@marketinScripts`) that loads the official Marketin SDK and passes a signed config payload to the bridge.
-- CDN defaults for both the SDK (`https://cdn.jsdelivr.net/gh/ayg3/sdk@latest/marketin-sdk.min.js`) and the bridge bundle—no publishing step required.
+- CDN defaults for both the SDK (`https://cdn.jsdelivr.net/gh/MarketIN-Inc/sdk@latest/marketin-sdk.min.js`) and the bridge bundle—no publishing step required.
 - Environment-driven configuration so each deployment can set the required brand identifier (with optional fallbacks).
 - Optional `@marketinTracking` directive to push structured events into the data layer you already use.
 - Extensible helper that accepts per-render overrides for advanced pages or A/B tests.
@@ -47,7 +47,7 @@ Marketin Laravel Bridge is a lightweight helper that drops the Marketin JavaScri
 ## Quick start
 
 ```bash
-composer require ayg3/marketin-laravel-bridge
+composer require marketin-inc/marketin-laravel-bridge
 
 # In your base layout <head> tag:
 @marketinScripts([
@@ -74,7 +74,7 @@ Set `MARKETIN_BRAND_ID` in your environment before deploying. Affiliate, campaig
 ### 1. Install the package
 
 ```bash
-composer require ayg3/marketin-laravel-bridge
+composer require marketin-inc/marketin-laravel-bridge
 ```
 
 The service provider is auto-discovered; no manual registration is necessary.
@@ -94,7 +94,7 @@ You can leave the campaign or affiliate values blank if you plan to provide them
 
 Place `@marketinScripts()` once in your primary layout (typically inside `<head>`). The directive renders:
 
-1. The Marketin SDK tag (`https://cdn.jsdelivr.net/gh/ayg3/sdk@latest/marketin-sdk.min.js`) with the required `data-navigate-once` attribute.
+1. The Marketin SDK tag (`https://cdn.jsdelivr.net/gh/MarketIN-Inc/sdk@latest/marketin-sdk.min.js`) with the required `data-navigate-once` attribute.
 2. A configuration blob (`window.__marketInBridgeConfig`).
 3. The Marketin bridge bundle.
 
@@ -108,7 +108,7 @@ The package ships with `config/marketin.php`. You do not need to publish it unle
 
 | Variable                        | Default                                                          | Description |
 |---------------------------------|------------------------------------------------------------------|-------------|
-| `MARKETIN_SDK_URL`              | `https://cdn.jsdelivr.net/gh/ayg3/sdk@latest/marketin-sdk.min.js` | CDN location of the Marketin SDK. |
+| `MARKETIN_SDK_URL`              | `https://cdn.jsdelivr.net/gh/MarketIN-Inc/sdk@latest/marketin-sdk.min.js` | CDN location of the Marketin SDK. |
 | `MARKETIN_BRAND_ID`             | `null`                                                           | **Required.** Your Marketin brand identifier. |
 | `MARKETIN_CAMPAIGN_ID`          | `null`                                                           | Optional fallback campaign identifier; typical traffic supplies `cid` via URL. |
 | `MARKETIN_AFFILIATE_ID`         | `null`                                                           | Optional fallback affiliate/advocate identifier; typical traffic supplies `aid` via URL. |
@@ -116,7 +116,7 @@ The package ships with `config/marketin.php`. You do not need to publish it unle
 | `MARKETIN_DEFAULT_AFFILIATE_ID` | `null`                                                           | Secondary affiliate fallback when neither URL parameters nor overrides are provided. |
 | `MARKETIN_API_ENDPOINT`         | `https://api.marketin.now/api/v1`                                | REST endpoint consumed by the bridge. |
 | `MARKETIN_DEBUG`                | `false`                                                          | Enables verbose console logging. |
-| `MARKETIN_BRIDGE_URL`           | `https://cdn.jsdelivr.net/gh/ayg3/marketin_laravel_bridge@latest/dist/marketin-bridge.js` | CDN location of the Laravel bridge bundle. |
+| `MARKETIN_BRIDGE_URL`           | `https://cdn.jsdelivr.net/gh/MarketIN-Inc/marketin_laravel_bridge@latest/dist/marketin-bridge.js` | CDN location of the Laravel bridge bundle. |
 | `MARKETIN_ASSET_PATH`           | `vendor/marketin`                                                | Target path if you choose to self-host the bridge. |
 | `MARKETIN_BRIDGE_FILENAME`      | `marketin-bridge.js`                                             | Filename used when self-hosting. |
 | `MARKETIN_TRACKING_ENABLED`     | `true`                                                           | Toggles the `@marketinTracking` directive output. |

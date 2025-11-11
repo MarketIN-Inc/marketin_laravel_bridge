@@ -9,7 +9,7 @@ return [
     | The URL for the primary Marketin JavaScript SDK. This script is expected
     | to expose the global `window.MarketIn` object consumed by the bridge.
     */
-    'sdk_url' => env('MARKETIN_SDK_URL', 'https://cdn.jsdelivr.net/gh/ayg3/sdk@latest/marketin-sdk.min.js'),
+    'sdk_url' => env('MARKETIN_SDK_URL', 'https://cdn.jsdelivr.net/gh/MarketIN-Inc/sdk@latest/marketin-sdk.min.js'),
     'sdk_attributes' => [
         'data-navigate-once' => true,
     ],
@@ -51,7 +51,7 @@ return [
     'assets' => [
         'publish_path' => env('MARKETIN_ASSET_PATH', 'vendor/marketin'),
         'bridge_filename' => env('MARKETIN_BRIDGE_FILENAME', 'marketin-bridge.js'),
-        'bridge_url' => env('MARKETIN_BRIDGE_URL', 'https://cdn.jsdelivr.net/gh/ayg3/marketin_laravel_bridge@latest/dist/marketin-bridge.js'),
+        'bridge_url' => env('MARKETIN_BRIDGE_URL', 'https://cdn.jsdelivr.net/gh/MarketIN-Inc/marketin_laravel_bridge@latest/dist/marketin-bridge.js'),
     ],
 
     /*
