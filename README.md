@@ -50,7 +50,19 @@ Marketin Laravel Bridge is a lightweight helper that drops the Marketin JavaScri
 composer require ayg3/marketin-laravel-bridge
 
 # In your base layout <head> tag:
-@marketinScripts()
+@marketinScripts([
+    'productId' => request('pid'),
+    'campaignId' => request('cid'),
+    'affiliateId' => request('aid'),
+])
+
+#In your base layout <main> tag
+@marketinTracking([
+    'event' => 'marketin.page_view',
+    'productId' => request('pid'),
+    'campaignId' => request('cid'),
+    'affiliateId' => request('aid'),
+])
 ```
 
 Set `MARKETIN_BRAND_ID` in your environment before deploying. Affiliate, campaign, and product identifiers will normally arrive via URL parameters when Marketin hands off traffic.
@@ -73,8 +85,6 @@ Add the IDs Marketin assigned to you. The bridge will refuse to initialise if `M
 
 ```dotenv
 MARKETIN_BRAND_ID=123
-MARKETIN_CAMPAIGN_ID=456
-MARKETIN_AFFILIATE_ID=789
 MARKETIN_API_ENDPOINT=https://api.marketin.now/api/v1
 ```
 
@@ -141,10 +151,20 @@ By default the directive loads the bridge from the CDN value in `MARKETIN_BRIDGE
     <meta charset="utf-8">
     <title>{{ config('app.name') }}</title>
 
-    @marketinScripts()
+    @marketinScripts([
+        'productId' => request('pid'),
+        'campaignId' => request('cid'),
+        'affiliateId' => request('aid'),
+    ])
 </head>
 <body>
     {{ $slot ?? '' }}
+    @marketinTracking([
+        'event' => 'marketin.page_view',
+        'productId' => request('pid'),
+        'campaignId' => request('cid'),
+        'affiliateId' => request('aid'),
+    ])
 </body>
 </html>
 ```
