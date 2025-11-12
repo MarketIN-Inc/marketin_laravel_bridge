@@ -39,6 +39,18 @@ return [
     */
     'api_endpoint' => env('MARKETIN_API_ENDPOINT', 'https://api.marketin.now/api/v1'),
     'debug' => env('MARKETIN_DEBUG', false),
+    /*
+    |--------------------------------------------------------------------------
+    | API Tokens / Public Path
+    |--------------------------------------------------------------------------
+    |
+    | Use `api_token` when posting to protected server endpoints. For simple
+    | integrations that cannot present a JWT, the bridge will post to the
+    | configurable `api_public_path` (default: `/sdk-log-conversion/`) and
+    | include `X-BRAND-ID` in the request headers.
+    */
+    'api_token' => env('MARKETIN_API_TOKEN', null),
+    'api_public_path' => env('MARKETIN_API_PUBLIC_PATH', '/sdk-log-conversion'),
 
     /*
     |--------------------------------------------------------------------------

@@ -48,8 +48,9 @@ class SendConversionToMarketin implements ShouldQueue
         // cannot present a server JWT can still post conversions. This
         // endpoint expects the X-BRAND-ID header and accepts payloads
         // without an Authorization token.
-        $publicPath = Arr::get($config, '/sdk-log-conversion');
-        $url = rtrim($endpoint, '/') . '/' . ltrim($publicPath, '/');
+        $publicPath = (string) Arr::get($config, 'api_public_path', '/sdk-log-conversion');
+        $normalizedPath = trim($publicPath, '/');
+        $url = rtrim($endpoint, '/') . '/' . $normalizedPath . '/';
 
         $body = [
             'brandId' => $brandId,
