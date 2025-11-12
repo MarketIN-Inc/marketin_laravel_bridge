@@ -31,6 +31,7 @@ Marketin Laravel Bridge is a lightweight helper that drops the Marketin JavaScri
 - CDN defaults for both the SDK (`https://cdn.jsdelivr.net/gh/MarketIN-Inc/sdk@latest/marketin-sdk.min.js`) and the bridge bundle—no publishing step required.
 - Environment-driven configuration so each deployment can set the required brand identifier (with optional fallbacks).
 - Optional `@marketinTracking` directive to push structured events into the data layer you already use.
+- Drop-in conversion pipeline: URL parameters are persisted automatically and confirmed Paystack webhooks queue a Market!N conversion without manual wiring.
 - Extensible helper that accepts per-render overrides for advanced pages or A/B tests.
 
 ## Requirements
@@ -63,9 +64,16 @@ composer require marketin-inc/marketin-laravel-bridge
     'campaignId' => request('cid'),
     'affiliateId' => request('aid'),
 ])
+
+# Enable the Paystack webhook
+MARKETIN_PAYSTACK_ENABLED=true
+PAYSTACK_WEBHOOK_SECRET=your-paystack-secret
+QUEUE_CONNECTION=database # or redis / sqs / etc.
 ```
 
 Set `MARKETIN_BRAND_ID` in your environment before deploying. Affiliate, campaign, and product identifiers will normally arrive via URL parameters when Marketin hands off traffic.
+
+Once the queue connection is set, run a worker (`php artisan queue:work`) so conversion jobs can post to the Marketin API.
 
 ---
 
@@ -121,6 +129,8 @@ The package ships with `config/marketin.php`. You do not need to publish it unle
 | `MARKETIN_BRIDGE_FILENAME`      | `marketin-bridge.js`                                             | Filename used when self-hosting. |
 | `MARKETIN_TRACKING_ENABLED`     | `true`                                                           | Toggles the `@marketinTracking` directive output. |
 | `MARKETIN_TRACKING_LAYER`       | `dataLayer`                                                      | Window variable that receives tracking events. |
+| `MARKETIN_PAYSTACK_ENABLED`     | `false`                                                          | When true, registers the Paystack webhook route. |
+| `PAYSTACK_WEBHOOK_SECRET`       | `null`                                                           | Secret used to validate Paystack webhook signatures. |
 
 ### Bridge hosting
 
@@ -179,6 +189,38 @@ Place `@marketinTracking()` near the bottom of your layout if you want every pag
     'brandId' => config('marketin.brand_id'),
 ])
 ```
+
+### Conversion tracking (drop-in)
+
+The package now handles conversions end-to-end once the Paystack webhook is enabled:
+
+1. The included middleware (`marketin.persist_params`) runs automatically, persisting `aid`, `cid`, and `pid` from incoming URLs into the session and an encrypted cookie.
+2. Paystack sends its payment confirmation to the published webhook route (defaults to `POST /marketin/paystack/webhook`). The controller verifies the signature, normalises the payload using `config/marketin.php`, and merges any stored attribution identifiers.
+3. `ConversionDispatcher` queues `SendConversionToMarketin`, which posts the conversion to the Market!N API. All you need is a running queue worker.
+
+```bash
+# For database queues
+php artisan queue:table
+php artisan migrate
+php artisan queue:work
+```
+
+#### Triggering conversions manually (optional)
+
+If you confirm payments outside the webhook (for example inside a Livewire component after a synchronous checkout), call the dispatcher directly:
+
+```php
+use Marketin\LaravelBridge\Support\ConversionDispatcher;
+
+ConversionDispatcher::queue([
+    'value' => $order->total / 100,
+    'currency' => $order->currency,
+    'orderId' => $order->reference,
+    'productId' => $order->product_id,
+]);
+```
+
+The middleware still supplies affiliate and campaign identifiers automatically, so you only pass the fields you know at confirmation time. You can mix this PHP helper with the webhook flow as needed.
 
 ### URL parameter intake
 
