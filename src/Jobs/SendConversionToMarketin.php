@@ -44,15 +44,23 @@ class SendConversionToMarketin implements ShouldQueue
             return;
         }
 
-        $url = sprintf('%s/conversions', $endpoint);
+        // Use a public SDK-friendly path by default so integrations that
+        // cannot present a server JWT can still post conversions. This
+        // endpoint expects the X-BRAND-ID header and accepts payloads
+        // without an Authorization token.
+        $publicPath = Arr::get($config, '/sdk-log-conversion');
+        $url = rtrim($endpoint, '/') . '/' . ltrim($publicPath, '/');
+
         $body = [
             'brandId' => $brandId,
             'conversion' => Arr::except($this->payload, ['brandId']),
         ];
 
-        $response = Http::withHeaders([
+        $headers = [
             'Accept' => 'application/json',
-        ])->post($url, $body);
+            'X-BRAND-ID' => (string) $brandId,
+        ];
+        $response = Http::withHeaders($headers)->post($url, $body);
 
         if (! $response->successful()) {
             $status = $response->status();
