@@ -51,6 +51,28 @@ class MarketinParams
             static fn ($value) => $value !== null && $value !== ''
         );
 
-        return new MarketinParamsBag($params);
+        // Merge query string parameters (aid, cid, pid) with highest precedence
+        $queryOverrides = [];
+        $request = $request ?? request();
+
+        if ($request) {
+            $aid = $request->query('aid');
+            $cid = $request->query('cid');
+            $pid = $request->query('pid');
+
+            if ($aid !== null && $aid !== '') {
+                $queryOverrides['affiliate_id'] = $aid;
+            }
+
+            if ($cid !== null && $cid !== '') {
+                $queryOverrides['campaign_id'] = $cid;
+            }
+
+            if ($pid !== null && $pid !== '') {
+                $queryOverrides['product_id'] = $pid;
+            }
+        }
+
+        return new MarketinParamsBag(array_merge($params, $queryOverrides));
     }
 }

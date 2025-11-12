@@ -118,9 +118,9 @@ return [
                     ],
                     'currency' => 'data.currency',
                     'orderId' => 'data.reference',
-                    'productId' => 'metadata.product_id',
-                    'affiliateId' => 'metadata.affiliate_id',
-                    'campaignId' => 'metadata.campaign_id',
+                    'productId' => 'data.metadata.product_id',
+                    'affiliateId' => 'data.metadata.affiliate_id',
+                    'campaignId' => 'data.metadata.campaign_id',
                     'customerEmail' => 'data.customer.email',
                 ],
                 'defaults' => [

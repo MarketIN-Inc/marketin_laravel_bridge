@@ -34,13 +34,17 @@ class ConversionDispatcher
         $payload['brandId'] = $brandId;
         $payload['affiliateId'] = $payload['affiliateId']
             ?? $context['affiliateId']
+            ?? request()->query('aid')
             ?? $params->affiliateId()
             ?? Arr::get($config, 'affiliate_id');
         $payload['campaignId'] = $payload['campaignId']
             ?? $context['campaignId']
+            ?? request()->query('cid')
             ?? $params->campaignId()
             ?? Arr::get($config, 'campaign_id');
-        $payload['productId'] = $payload['productId'] ?? $params->productId();
+        $payload['productId'] = $payload['productId']
+            ?? request()->query('pid')
+            ?? $params->productId();
 
         $job = new SendConversionToMarketin($payload, $context);
 
