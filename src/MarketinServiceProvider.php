@@ -2,8 +2,13 @@
 
 namespace Marketin\LaravelBridge;
 
+use Illuminate\Routing\Router;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
+use Marketin\LaravelBridge\Http\Controllers\PaystackWebhookController;
+use Marketin\LaravelBridge\Http\Middleware\PersistMarketinParams;
 
 class MarketinServiceProvider extends ServiceProvider
 {
@@ -20,8 +25,10 @@ class MarketinServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-    $this->registerPublishing();
-    $this->registerDirectives();
+        $this->registerPublishing();
+        $this->registerDirectives();
+        $this->registerMiddleware();
+        $this->registerRoutes();
     }
 
     /**
@@ -58,6 +65,43 @@ class MarketinServiceProvider extends ServiceProvider
 
             return "<?php echo \\Marketin\\LaravelBridge\\Support\\BridgeDirective::tracking({$expression}); ?>";
         });
+    }
+
+    /**
+     * Ensure attribution persistence middleware is available for host apps.
+     */
+    protected function registerMiddleware(): void
+    {
+        /** @var Router $router */
+        $router = $this->app['router'];
+
+        if (! config('marketin.payments.persistence.enabled', true)) {
+            $router->aliasMiddleware('marketin.persist_params', PersistMarketinParams::class);
+
+            return;
+        }
+
+        $router->aliasMiddleware('marketin.persist_params', PersistMarketinParams::class);
+        $router->pushMiddlewareToGroup('web', PersistMarketinParams::class);
+    }
+
+    /**
+     * Register webhook routes for supported payment providers.
+     */
+    protected function registerRoutes(): void
+    {
+        $paystack = config('marketin.payments.providers.paystack');
+
+        if (! Arr::get($paystack, 'enabled')) {
+            return;
+        }
+
+        $uri = Arr::get($paystack, 'webhook.uri', 'marketin/paystack/webhook');
+        $middleware = Arr::get($paystack, 'webhook.middleware', ['api']);
+
+        Route::middleware($middleware)
+            ->post($uri, PaystackWebhookController::class)
+            ->name('marketin.payments.paystack.webhook');
     }
 
 }

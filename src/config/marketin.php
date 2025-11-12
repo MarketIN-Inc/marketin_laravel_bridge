@@ -9,7 +9,7 @@ return [
     | The URL for the primary Marketin JavaScript SDK. This script is expected
     | to expose the global `window.MarketIn` object consumed by the bridge.
     */
-    'sdk_url' => env('MARKETIN_SDK_URL', 'https://cdn.jsdelivr.net/gh/MarketIN-Inc/sdk@latest/marketin-sdk.min.js'),
+    'sdk_url' => env('MARKETIN_SDK_URL', 'https://cdn.jsdelivr.net/gh/MarketIN-Inc/marketin-sdk@1.0.2/marketin-sdk.min.js'),
     'sdk_attributes' => [
         'data-navigate-once' => true,
     ],
@@ -65,5 +65,56 @@ return [
     'tracking' => [
         'enabled' => (bool) env('MARKETIN_TRACKING_ENABLED', true),
         'layer_variable' => env('MARKETIN_TRACKING_LAYER', 'dataLayer'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Payment + Conversion Integration
+    |--------------------------------------------------------------------------
+    |
+    | Configure how the package captures attribution parameters and reacts to
+    | payment provider callbacks. Middleware persists query parameters for
+    | later use, while provider settings drive webhook registration and
+    | payload normalisation for ConversionDispatcher.
+    */
+    'payments' => [
+        'persistence' => [
+            'enabled' => true,
+            'cookie_name' => env('MARKETIN_PARAMS_COOKIE', 'marketin_params'),
+            'cookie_lifetime' => 60 * 24 * 30,
+            'session_key' => 'marketin.params',
+            'query_keys' => [
+                'aid' => 'affiliate_id',
+                'cid' => 'campaign_id',
+                'pid' => 'product_id',
+            ],
+        ],
+
+        'providers' => [
+            'paystack' => [
+                'enabled' => env('MARKETIN_PAYSTACK_ENABLED', false),
+                'webhook' => [
+                    'uri' => env('MARKETIN_PAYSTACK_WEBHOOK_URI', 'marketin/paystack/webhook'),
+                    'middleware' => ['api'],
+                    'signature_header' => 'x-paystack-signature',
+                    'secret' => env('PAYSTACK_WEBHOOK_SECRET'),
+                ],
+                'mapping' => [
+                    'value' => [
+                        'path' => 'data.amount',
+                        'scale' => 0.01,
+                    ],
+                    'currency' => 'data.currency',
+                    'orderId' => 'data.reference',
+                    'productId' => 'metadata.product_id',
+                    'affiliateId' => 'metadata.affiliate_id',
+                    'campaignId' => 'metadata.campaign_id',
+                    'customerEmail' => 'data.customer.email',
+                ],
+                'defaults' => [
+                    'eventType' => 'purchase',
+                ],
+            ],
+        ],
     ],
 ];
