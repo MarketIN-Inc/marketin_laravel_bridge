@@ -2,6 +2,14 @@ const MARKETIN_PARAM_KEY = 'marketinParams';
 
 const isBrowser = typeof window !== 'undefined';
 
+const SDK_RETRY_INTERVAL_MS = 250;
+const SDK_TIMEOUT_NOTICE_MS = 5000;
+
+let sdkRetryTimer = null;
+let sdkWaitStartedAt = null;
+let sdkMissingWarned = false;
+let sdkTimeoutNotified = false;
+
 const readStoredMarketInParams = () => {
 	if (!isBrowser) {
 		return {};
@@ -313,6 +321,21 @@ const attachDeclarativeHooks = () => {
 	}
 };
 
+const scheduleSdkRetry = () => {
+	if (!isBrowser) {
+		return;
+	}
+
+	if (sdkRetryTimer !== null) {
+		return;
+	}
+
+	sdkRetryTimer = window.setTimeout(() => {
+		sdkRetryTimer = null;
+		registerMarketInBridge(latestOptions);
+	}, SDK_RETRY_INTERVAL_MS);
+};
+
 const registerMarketInBridge = (options) => {
 	if (!isBrowser) {
 		return;
@@ -331,7 +354,36 @@ const registerMarketInBridge = (options) => {
 		return;
 	}
 
-	if (typeof window.MarketIn !== 'undefined' && !window.__marketInInitialized) {
+	bindMarketInEvents();
+	attachDeclarativeHooks();
+
+	if (typeof window.MarketIn === 'undefined') {
+		if (!sdkMissingWarned) {
+			console.warn('[MarketIn Demo] MarketIn SDK not detected yet. Waiting for the SDK to finish loading before continuing bootstrap.');
+			sdkMissingWarned = true;
+		}
+
+		if (sdkWaitStartedAt === null) {
+			sdkWaitStartedAt = Date.now();
+		} else if (!sdkTimeoutNotified && Date.now() - sdkWaitStartedAt >= SDK_TIMEOUT_NOTICE_MS) {
+			console.error('[MarketIn Demo] MarketIn SDK still missing after waiting 5000 ms. Confirm the @marketinScripts directive renders before </head> and that network requests to the SDK succeed.');
+			sdkTimeoutNotified = true;
+		}
+
+		scheduleSdkRetry();
+		return;
+	}
+
+	if (sdkRetryTimer !== null) {
+		window.clearTimeout(sdkRetryTimer);
+		sdkRetryTimer = null;
+	}
+
+	sdkWaitStartedAt = null;
+	sdkMissingWarned = false;
+	sdkTimeoutNotified = false;
+
+	if (!window.__marketInInitialized) {
 		window.MarketIn.init({
 			brandId: resolved.brandId,
 			campaignId,
@@ -352,10 +404,13 @@ const registerMarketInBridge = (options) => {
 		}
 
 		window.__marketInInitialized = true;
+	} else if (resolved.debug) {
+		console.log('ℹ️ MarketIn SDK already initialised; refreshing bridge context.', {
+			brandId: resolved.brandId,
+			campaignId,
+			affiliateId,
+		});
 	}
-
-	bindMarketInEvents();
-	attachDeclarativeHooks();
 
 	if (window.MarketIn?.trackPageView) {
 		window.MarketIn.trackPageView();
@@ -386,6 +441,7 @@ const bootstrapMarketInBridge = (options = {}) => {
 		document.addEventListener('livewire:navigated', () => {
 			execute();
 		});
+		window.addEventListener('marketin:sdk-loaded', execute);
 	} else {
 		execute();
 	}

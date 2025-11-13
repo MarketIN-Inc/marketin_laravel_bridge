@@ -98,9 +98,11 @@ You can leave the campaign or affiliate values blank if you plan to provide them
 
 Place `@marketinScripts()` once in your primary layout (typically inside `<head>`). The directive renders:
 
-1. The Marketin SDK tag (`https://cdn.jsdelivr.net/gh/MarketIN-Inc/sdk@latest/marketin-sdk.min.js`) with the required `data-navigate-once` attribute.
+1. The Marketin SDK tag (`https://cdn.jsdelivr.net/gh/MarketIN-Inc/sdk@latest/marketin-sdk.min.js`) with the required `data-navigate-once` attribute and `defer` so the bridge never races the SDK.
 2. A configuration blob (`window.__marketInBridgeConfig`).
 3. The Marketin bridge bundle.
+
+When `MARKETIN_DEBUG=true`, the bridge prints a "✅ MarketIn SDK initialized" message once the SDK is available and surfaces warnings if the SDK fails to load in time. That makes layout or CDN issues immediately visible during integration.
 
 ---
 

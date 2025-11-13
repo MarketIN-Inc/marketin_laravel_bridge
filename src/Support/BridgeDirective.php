@@ -18,13 +18,13 @@ class BridgeDirective
 
         $sdkUrl = $resolved['sdkUrl'];
         $bridgeSrc = $resolved['bridgeSrc'];
-    $dataset = $resolved['dataset'];
-    $datasetString = self::attributeString($dataset);
-    $sdkAttrString = self::attributeString($resolved['sdkAttributes'], true);
+        $dataset = $resolved['dataset'];
+        $datasetString = self::attributeString($dataset);
+        $sdkAttrString = self::attributeString($resolved['sdkAttributes'], true);
         $bridgeConfig = json_encode($resolved['bridgeConfig'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
 
         $snippet = <<<HTML
-<script src="{$sdkUrl}"{$sdkAttrString} async></script>
+    <script src="{$sdkUrl}"{$sdkAttrString}></script>
 <script>
 window.__marketInBridgeConfig = {$bridgeConfig};
 </script>
@@ -92,6 +92,41 @@ HTML;
         $sdkAttributes = is_array($rawSdkAttributes)
             ? $rawSdkAttributes
             : Arr::wrap($rawSdkAttributes);
+
+        $normalizedSdkAttributes = [];
+        $hasDeferAttribute = false;
+
+        foreach ($sdkAttributes as $attribute => $value) {
+            if (is_int($attribute)) {
+                $attribute = $value;
+                $value = true;
+            }
+
+            if (! is_string($attribute)) {
+                continue;
+            }
+
+            $normalized = strtolower($attribute);
+
+            if ($normalized === 'async') {
+                continue;
+            }
+
+            if ($normalized === 'defer') {
+                $hasDeferAttribute = true;
+                $normalizedSdkAttributes['defer'] = $value;
+
+                continue;
+            }
+
+            $normalizedSdkAttributes[$attribute] = $value;
+        }
+
+        if (! $hasDeferAttribute) {
+            $normalizedSdkAttributes['defer'] = true;
+        }
+
+        $sdkAttributes = $normalizedSdkAttributes;
 
         $bridgeConfig = array_filter([
             'brandId' => self::numericOrValue($merged['brandId'] ?? $merged['brand_id'] ?? null),

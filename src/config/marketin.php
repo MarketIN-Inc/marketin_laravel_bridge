@@ -12,6 +12,7 @@ return [
     'sdk_url' => env('MARKETIN_SDK_URL', 'https://cdn.jsdelivr.net/gh/MarketIN-Inc/marketin-sdk@1.0.2/marketin-sdk.min.js'),
     'sdk_attributes' => [
         'data-navigate-once' => true,
+        'defer' => true,
     ],
 
     /*
