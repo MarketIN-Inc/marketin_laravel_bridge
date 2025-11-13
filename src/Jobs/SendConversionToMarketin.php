@@ -52,15 +52,38 @@ class SendConversionToMarketin implements ShouldQueue
         $normalizedPath = trim($publicPath, '/');
         $url = rtrim($endpoint, '/') . '/' . $normalizedPath . '/';
 
+        $conversion = Arr::except($this->payload, ['brandId']);
+
         $body = [
             'brandId' => $brandId,
-            'conversion' => Arr::except($this->payload, ['brandId']),
+            'conversion' => $conversion,
         ];
 
         $headers = [
             'Accept' => 'application/json',
             'X-BRAND-ID' => (string) $brandId,
         ];
+
+        $affiliateId = Arr::get($this->payload, 'affiliateId');
+        $campaignId = Arr::get($this->payload, 'campaignId');
+
+        if ($affiliateId !== null && $affiliateId !== '') {
+            $headers['X-AFFILIATE-ID'] = (string) $affiliateId;
+        }
+
+        if ($campaignId !== null && $campaignId !== '') {
+            $headers['X-CAMPAIGN-ID'] = (string) $campaignId;
+        }
+
+        if (config('marketin.debug', false)) {
+            Log::debug('Dispatching Marketin conversion', [
+                'endpoint' => $url,
+                'headers' => $headers,
+                'body' => $body,
+                'context' => $this->context,
+            ]);
+        }
+
         $response = Http::withHeaders($headers)->post($url, $body);
 
         if (! $response->successful()) {

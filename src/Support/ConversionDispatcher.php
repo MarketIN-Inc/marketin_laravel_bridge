@@ -22,9 +22,12 @@ class ConversionDispatcher
     {
         $config = config('marketin');
 
-        $brandId = $payload['brandId']
-            ?? $context['brandId']
-            ?? Arr::get($config, 'brand_id');
+        $brandId = self::firstValue(
+            $payload['brandId'] ?? null,
+            Arr::get($context, 'brandId'),
+            Arr::get($context, 'brand_id'),
+            Arr::get($config, 'brand_id')
+        );
 
         if (! $brandId) {
             Log::warning('Marketin conversion skipped: missing brandId', ['payload' => $payload, 'context' => $context]);
@@ -32,6 +35,9 @@ class ConversionDispatcher
         }
 
         $params = MarketinParams::current();
+        $requestAffiliate = self::requestQuery('aid');
+        $requestCampaign = self::requestQuery('cid');
+        $requestProduct = self::requestQuery('pid');
 
         $stored = [];
 
@@ -46,22 +52,42 @@ class ConversionDispatcher
         }
 
         $payload['brandId'] = $brandId;
-        $payload['affiliateId'] = $payload['affiliateId']
-            ?? $context['affiliateId']
-            ?? $stored['affiliateId'] ?? null
-            ?? request()->query('aid')
-            ?? $params->affiliateId()
-            ?? Arr::get($config, 'affiliate_id');
-        $payload['campaignId'] = $payload['campaignId']
-            ?? $context['campaignId']
-            ?? $stored['campaignId'] ?? null
-            ?? request()->query('cid')
-            ?? $params->campaignId()
-            ?? Arr::get($config, 'campaign_id');
-        $payload['productId'] = $payload['productId']
-            ?? $stored['productId'] ?? null
-            ?? request()->query('pid')
-            ?? $params->productId();
+        $payload['affiliateId'] = self::firstValue(
+            Arr::get($payload, 'affiliateId'),
+            Arr::get($payload, 'affiliate_id'),
+            Arr::get($context, 'affiliateId'),
+            Arr::get($context, 'affiliate_id'),
+            Arr::get($stored, 'affiliateId'),
+            Arr::get($stored, 'affiliate_id'),
+            $requestAffiliate,
+            $params->affiliateId(),
+            Arr::get($config, 'affiliate_id'),
+            Arr::get($config, 'default_affiliate_id')
+        );
+
+        $payload['campaignId'] = self::firstValue(
+            Arr::get($payload, 'campaignId'),
+            Arr::get($payload, 'campaign_id'),
+            Arr::get($context, 'campaignId'),
+            Arr::get($context, 'campaign_id'),
+            Arr::get($stored, 'campaignId'),
+            Arr::get($stored, 'campaign_id'),
+            $requestCampaign,
+            $params->campaignId(),
+            Arr::get($config, 'campaign_id'),
+            Arr::get($config, 'default_campaign_id')
+        );
+
+        $payload['productId'] = self::firstValue(
+            Arr::get($payload, 'productId'),
+            Arr::get($payload, 'product_id'),
+            Arr::get($context, 'productId'),
+            Arr::get($context, 'product_id'),
+            Arr::get($stored, 'productId'),
+            Arr::get($stored, 'product_id'),
+            $requestProduct,
+            $params->productId()
+        );
 
         $job = new SendConversionToMarketin($payload, $context);
 
@@ -91,5 +117,39 @@ class ConversionDispatcher
         }
 
         return null;
+    }
+
+    protected static function firstValue(mixed ...$candidates): mixed
+    {
+        foreach ($candidates as $value) {
+            if ($value === null) {
+                continue;
+            }
+
+            if (is_string($value)) {
+                $trimmed = trim($value);
+
+                if ($trimmed === '') {
+                    continue;
+                }
+
+                return $trimmed;
+            }
+
+            return $value;
+        }
+
+        return null;
+    }
+
+    protected static function requestQuery(string $key): mixed
+    {
+        if (! app()->bound('request')) {
+            return null;
+        }
+
+        $request = request();
+
+        return $request?->query($key);
     }
 }
