@@ -50,6 +50,8 @@ class SendConversionToMarketinTest extends TestCase
         $this->assertSame('af-1', Arr::get($captured, 'headers.X-AFFILIATE-ID.0'));
         $this->assertSame('camp-9', Arr::get($captured, 'headers.X-CAMPAIGN-ID.0'));
         $this->assertSame(123, Arr::get($captured, 'body.brandId'));
-        $this->assertSame(100, Arr::get($captured, 'body.conversion.value'));
+        $this->assertSame('af-1', Arr::get($captured, 'body.affiliateId'));
+        $this->assertSame('camp-9', Arr::get($captured, 'body.campaignId'));
+        $this->assertSame(100, Arr::get($captured, 'body.value'));
     }
 }

@@ -52,12 +52,8 @@ class SendConversionToMarketin implements ShouldQueue
         $normalizedPath = trim($publicPath, '/');
         $url = rtrim($endpoint, '/') . '/' . $normalizedPath . '/';
 
-        $conversion = Arr::except($this->payload, ['brandId']);
-
-        $body = [
-            'brandId' => $brandId,
-            'conversion' => $conversion,
-        ];
+        // Flatten the payload: Django expects all fields at root level, not nested under 'conversion'
+        $body = $this->payload;
 
         $headers = [
             'Accept' => 'application/json',
