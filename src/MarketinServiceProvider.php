@@ -9,6 +9,9 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Marketin\LaravelBridge\Http\Controllers\PaystackWebhookController;
 use Marketin\LaravelBridge\Http\Middleware\PersistMarketinParams;
+use Marketin\LaravelBridge\Support\Automation\AttributionContextResolver;
+use Marketin\LaravelBridge\Support\Automation\PendingAttributionStore;
+use Marketin\LaravelBridge\Support\MarketinManager;
 
 class MarketinServiceProvider extends ServiceProvider
 {
@@ -18,6 +21,22 @@ class MarketinServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/config/marketin.php', 'marketin');
+
+        $this->app->singleton(AttributionContextResolver::class, function ($app) {
+            return new AttributionContextResolver($app);
+        });
+
+        $this->app->singleton(PendingAttributionStore::class, function ($app) {
+            return new PendingAttributionStore($app->make('cache.store'));
+        });
+
+        $this->app->singleton('marketin.manager', function ($app) {
+            return new MarketinManager(
+                $app,
+                $app->make(AttributionContextResolver::class),
+                $app->make(PendingAttributionStore::class)
+            );
+        });
     }
 
     /**
@@ -29,6 +48,7 @@ class MarketinServiceProvider extends ServiceProvider
         $this->registerDirectives();
         $this->registerMiddleware();
         $this->registerRoutes();
+        $this->bootAutomation();
     }
 
     /**
@@ -64,6 +84,10 @@ class MarketinServiceProvider extends ServiceProvider
             $expression = $expression ?: '[]';
 
             return "<?php echo \\Marketin\\LaravelBridge\\Support\\BridgeDirective::tracking({$expression}); ?>";
+        });
+
+        Blade::directive('marketinAutoTrack', function () {
+            return "<?php \\Marketin\\LaravelBridge\\Facades\\Marketin::enableAutomation(); ?>";
         });
     }
 
@@ -102,6 +126,23 @@ class MarketinServiceProvider extends ServiceProvider
         Route::middleware($middleware)
             ->post($uri, PaystackWebhookController::class)
             ->name('marketin.payments.paystack.webhook');
+    }
+
+    protected function bootAutomation(): void
+    {
+        if (! config('marketin.automation.enabled', true)) {
+            return;
+        }
+
+        $this->app->afterResolving('marketin.manager', function (MarketinManager $manager) {
+            $manager->enableAutomation();
+        });
+
+        $this->app->booted(function ($app) {
+            /** @var MarketinManager $manager */
+            $manager = $app->make('marketin.manager');
+            $manager->enableAutomation();
+        });
     }
 
 }

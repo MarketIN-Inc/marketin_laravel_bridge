@@ -129,4 +129,12 @@ return [
             ],
         ],
     ],
+
+    'automation' => [
+        'enabled' => (bool) env('MARKETIN_AUTOMATION_ENABLED', true),
+        'attach_paystack_metadata' => (bool) env('MARKETIN_AUTOMATION_ATTACH_PAYSTACK_METADATA', true),
+        'store_checkout_context' => (bool) env('MARKETIN_AUTOMATION_STORE_CHECKOUT_CONTEXT', true),
+        'checkout_context_ttl' => (int) env('MARKETIN_AUTOMATION_CONTEXT_TTL', 60 * 24 * 2),
+        'auto_queue_conversion' => (bool) env('MARKETIN_AUTOMATION_QUEUE_CONVERSION', true),
+    ],
 ];
