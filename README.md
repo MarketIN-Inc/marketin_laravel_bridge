@@ -35,6 +35,7 @@ Marketin Laravel Bridge is a lightweight helper that drops the Marketin JavaScri
 - **Automatic conversion tracking**: The package listens to Paystack verification responses emitted by Laravel's HTTP client and queues conversions automatically—no code changes required. A middleware fallback is included for teams that proxy the raw JSON directly to the browser.
 - Drop-in conversion pipeline: attribution parameters survive gateway redirects and confirmed Paystack webhooks queue a Market!N conversion without manual wiring.
 - Automatic Paystack instrumentation: metadata injection, webhook dispatching, and conversion queuing now run out of the box—no checkout boilerplate required.
+- Marketing identifiers always win: Paystack metadata is rewritten with the captured `pid`/`cid`/`aid`, while the original catalog product ID is preserved as `catalog_product_id` for internal bookkeeping.
 - **Comprehensive logging**: When `MARKETIN_DEBUG=true`, see exactly what's happening in `laravel.log` with actionable error messages and clear success indicators.
 - Extensible helper that accepts per-render overrides for advanced pages or A/B tests.
 
@@ -219,6 +220,11 @@ With automation enabled (default), the package stitches the full Paystack flow t
 3. **SDK-based decoration**: If your app uses Paystack's PHP SDK (e.g., `Paystack::initialize()`), the package decorates the service to inject Marketin identifiers into `metadata` automatically and caches the attribution context against the Paystack reference.
 4. **Webhook support**: The package registers `POST /marketin/paystack/webhook` for you; the controller verifies signatures, normalizes payloads according to `config/marketin.php`, and forwards them to `ConversionDispatcher`. Missing IDs are recovered from the cached context, the active request, or persisted cookies.
 5. **Job queue**: `ConversionDispatcher` queues `SendConversionToMarketin`, which posts the conversion to the Marketin API using the SDK-compatible public endpoint (`/sdk-log-conversion/`) and the required `X-BRAND-ID` header. A queue worker is recommended, but the job falls back to synchronous execution when queues are disabled.
+
+**Identifier precedence**
+
+- The persisted Marketin parameters (`pid`, `cid`, `aid`) always override transaction metadata when conversions are queued. This guarantees that the marketing product ID captured from the landing URL is the same ID sent to the Marketin API, even when your checkout stores a separate catalog primary key.
+- When the package overwrites `metadata.product_id` with the marketing PID, the original catalog value is preserved as `metadata.catalog_product_id` so your application can still reconcile orders locally.
 
 ```bash
 # For database queues

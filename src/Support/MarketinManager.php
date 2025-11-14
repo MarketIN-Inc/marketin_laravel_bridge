@@ -101,7 +101,15 @@ class MarketinManager
             'orderId' => $this->extractValue($transaction, ['reference', 'data.reference', 'id', 'data.id']),
             'value' => $this->normalizeMonetaryValue($this->extractValue($transaction, ['amount', 'data.amount', 'value'])),
             'currency' => $this->extractValue($transaction, ['currency', 'data.currency']) ?? 'NGN',
-            'productId' => $this->extractValue($transaction, ['product_id', 'data.metadata.product_id', 'productId']),
+            'productId' => $this->extractValue($transaction, [
+                'pid',
+                'data.metadata.pid',
+                'metadata.pid',
+                'product_id',
+                'data.metadata.product_id',
+                'metadata.product_id',
+                'productId',
+            ]),
         ];
 
         $metadata = (array) $this->extractValue($transaction, ['metadata', 'data.metadata']) ?: [];
@@ -109,7 +117,7 @@ class MarketinManager
         $context = array_filter([
             'affiliateId' => Arr::get($metadata, 'affiliate_id') ?? Arr::get($metadata, 'aid'),
             'campaignId' => Arr::get($metadata, 'campaign_id') ?? Arr::get($metadata, 'cid'),
-            'productId' => Arr::get($metadata, 'product_id') ?? Arr::get($metadata, 'pid'),
+            'productId' => Arr::get($metadata, 'pid') ?? Arr::get($metadata, 'product_id'),
         ], fn ($value) => $value !== null && $value !== '');
 
         $payload = array_merge($standard, $context, $overrides);

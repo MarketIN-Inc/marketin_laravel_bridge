@@ -84,14 +84,14 @@ class ConversionDispatcher
         );
 
         $payload['productId'] = self::firstValue(
-            Arr::get($payload, 'productId'),
-            Arr::get($payload, 'product_id'),
             Arr::get($context, 'productId'),
             Arr::get($context, 'product_id'),
             Arr::get($stored, 'productId'),
             Arr::get($stored, 'product_id'),
             $requestProduct,
-            $params->productId()
+            $params->productId(),
+            Arr::get($payload, 'productId'),
+            Arr::get($payload, 'product_id')
         );
 
         $job = new SendConversionToMarketin($payload, $context);

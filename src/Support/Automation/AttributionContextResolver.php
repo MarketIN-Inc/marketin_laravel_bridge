@@ -53,17 +53,25 @@ class AttributionContextResolver
             $metadata = [];
         }
 
-        $metadata = array_merge(
-            [
-                'affiliate_id' => Arr::get($metadata, 'affiliate_id', $context['affiliateId'] ?? null),
-                'campaign_id' => Arr::get($metadata, 'campaign_id', $context['campaignId'] ?? null),
-                'product_id' => Arr::get($metadata, 'product_id', $context['productId'] ?? null),
-                'aid' => Arr::get($metadata, 'aid', $context['affiliateId'] ?? null),
-                'cid' => Arr::get($metadata, 'cid', $context['campaignId'] ?? null),
-                'pid' => Arr::get($metadata, 'pid', $context['productId'] ?? null),
-            ],
-            $metadata
-        );
+        $existingCatalogProductId = Arr::get($metadata, 'product_id');
+        $marketingProductId = $context['productId'] ?? null;
+
+        if ($marketingProductId && $existingCatalogProductId && $existingCatalogProductId !== $marketingProductId) {
+            $metadata['catalog_product_id'] = $metadata['catalog_product_id'] ?? $existingCatalogProductId;
+        }
+
+        $overrides = array_filter([
+            'affiliate_id' => $context['affiliateId'] ?? null,
+            'campaign_id' => $context['campaignId'] ?? null,
+            'product_id' => $marketingProductId,
+            'aid' => $context['affiliateId'] ?? null,
+            'cid' => $context['campaignId'] ?? null,
+            'pid' => $marketingProductId,
+        ], fn ($value) => $value !== null && $value !== '');
+
+        foreach ($overrides as $key => $value) {
+            $metadata[$key] = $value;
+        }
 
         if (! empty($metadata)) {
             $payload['metadata'] = $metadata;

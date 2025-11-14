@@ -94,6 +94,26 @@ class ConversionDispatcherTest extends TestCase
         });
     }
 
+    public function testRequestPidOverridesPayloadMetadata(): void
+    {
+        Bus::fake();
+
+        $request = Request::create('/', 'GET', ['pid' => 'marketing-override']);
+        $this->app->instance('request', $request);
+
+        ConversionDispatcher::queue([
+            'value' => 175.50,
+            'reference' => 'ref-override',
+            'productId' => '1',
+        ]);
+
+        Bus::assertDispatched(SendConversionToMarketin::class, function (SendConversionToMarketin $job) {
+            $payload = $this->readPayload($job);
+
+            return $payload['productId'] === 'marketing-override';
+        });
+    }
+
     /**
      * @param SendConversionToMarketin $job
      * @return array<string, mixed>
