@@ -141,6 +141,7 @@ The package ships with `config/marketin.php`. You do not need to publish it unle
 | `MARKETIN_AUTO_TRACK_HTTP_VERIFICATION` | `true`                                                  | Auto-detect and track Paystack verifications made via `Http::post()`. Set to `false` to disable automatic tracking and use manual `Marketin::trackAfterPayment()` calls instead. |
 | `MARKETIN_PAYSTACK_ENABLED`     | `false`                                                          | When true, registers the Paystack webhook route. |
 | `PAYSTACK_WEBHOOK_SECRET`       | `null`                                                           | Secret used to validate Paystack webhook signatures. |
+| `MARKETIN_DEFAULT_EVENT_TYPE`   | `purchase`                                                       | Default event type for conversions when not explicitly provided. Configurable via `payments.providers.paystack.defaults.eventType` in `config/marketin.php`. |
 
 ### Bridge hosting
 
@@ -225,6 +226,7 @@ With automation enabled (default), the package stitches the full Paystack flow t
 
 - The persisted Marketin parameters (`pid`, `cid`, `aid`) always override transaction metadata when conversions are queued. This guarantees that the marketing product ID captured from the landing URL is the same ID sent to the Marketin API, even when your checkout stores a separate catalog primary key.
 - When the package overwrites `metadata.product_id` with the marketing PID, the original catalog value is preserved as `metadata.catalog_product_id` so your application can still reconcile orders locally.
+- The `event_type` field defaults to `"purchase"` (configurable via `payments.providers.paystack.defaults.eventType` in `config/marketin.php`). The dispatcher automatically normalizes `eventType` (camelCase) to `event_type` (snake_case) before posting to the API, so your application meets the API contract without manual field mapping.
 
 ```bash
 # For database queues
@@ -263,6 +265,8 @@ Check `storage/logs/laravel.log` to see messages such as:
 [Marketin] ✅ Conversion successfully sent to API
 [Marketin] Skipping Paystack auto-track: verification response was not JSON (when applicable)
 ```
+
+When `MARKETIN_DEBUG=true`, the queued payload will include `eventType: "purchase"` (or your configured default), and the sent payload will show `event_type: "purchase"` after normalization.
 
 #### SDK-based Paystack integration
 

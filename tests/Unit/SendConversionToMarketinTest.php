@@ -54,4 +54,32 @@ class SendConversionToMarketinTest extends TestCase
         $this->assertSame('camp-9', Arr::get($captured, 'body.campaignId'));
         $this->assertSame(100, Arr::get($captured, 'body.value'));
     }
+
+    public function testEventTypeIsNormalizedToSnakeCase(): void
+    {
+        config([
+            'marketin.api_endpoint' => 'https://api.example.test/v1',
+            'marketin.api_public_path' => '/sdk-log-conversion',
+            'marketin.debug' => false,
+        ]);
+
+        $captured = null;
+
+        Http::fake(function (Request $request) use (&$captured) {
+            $captured = $request->data();
+
+            return Http::response(['ok' => true], 200);
+        });
+
+        $job = new SendConversionToMarketin([
+            'brandId' => 42,
+            'eventType' => 'purchase',
+            'value' => 250.00,
+        ]);
+
+        $job->handle();
+
+        $this->assertSame('purchase', Arr::get($captured, 'event_type'));
+        $this->assertArrayNotHasKey('eventType', $captured);
+    }
 }

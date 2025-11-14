@@ -94,6 +94,15 @@ class ConversionDispatcher
             Arr::get($payload, 'product_id')
         );
 
+        $payload['eventType'] = self::firstValue(
+            Arr::get($payload, 'eventType'),
+            Arr::get($payload, 'event_type'),
+            Arr::get($context, 'eventType'),
+            Arr::get($context, 'event_type'),
+            Arr::get($config, 'payments.providers.paystack.defaults.eventType'),
+            'purchase'
+        );
+
         $job = new SendConversionToMarketin($payload, $context);
 
         if ($debug) {
@@ -102,6 +111,7 @@ class ConversionDispatcher
                 'affiliateId' => $payload['affiliateId'] ?? null,
                 'campaignId' => $payload['campaignId'] ?? null,
                 'productId' => $payload['productId'] ?? null,
+                'eventType' => $payload['eventType'] ?? null,
                 'value' => $payload['value'] ?? null,
                 'reference' => self::resolveReference($payload, $context),
                 'source' => $context['source'] ?? 'manual',

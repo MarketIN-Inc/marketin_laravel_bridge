@@ -114,6 +114,53 @@ class ConversionDispatcherTest extends TestCase
         });
     }
 
+    public function testEventTypeDefaultsToProviderConfig(): void
+    {
+        Bus::fake();
+
+        config([
+            'marketin.payments.providers.paystack.defaults.eventType' => 'purchase',
+        ]);
+
+        $request = Request::create('/', 'GET');
+        $this->app->instance('request', $request);
+
+        ConversionDispatcher::queue([
+            'value' => 100.00,
+            'reference' => 'ref-no-event',
+        ]);
+
+        Bus::assertDispatched(SendConversionToMarketin::class, function (SendConversionToMarketin $job) {
+            $payload = $this->readPayload($job);
+
+            return $payload['eventType'] === 'purchase';
+        });
+    }
+
+    public function testEventTypeOverridesDefault(): void
+    {
+        Bus::fake();
+
+        config([
+            'marketin.payments.providers.paystack.defaults.eventType' => 'purchase',
+        ]);
+
+        $request = Request::create('/', 'GET');
+        $this->app->instance('request', $request);
+
+        ConversionDispatcher::queue([
+            'value' => 50.00,
+            'reference' => 'ref-custom',
+            'eventType' => 'subscription',
+        ]);
+
+        Bus::assertDispatched(SendConversionToMarketin::class, function (SendConversionToMarketin $job) {
+            $payload = $this->readPayload($job);
+
+            return $payload['eventType'] === 'subscription';
+        });
+    }
+
     /**
      * @param SendConversionToMarketin $job
      * @return array<string, mixed>
