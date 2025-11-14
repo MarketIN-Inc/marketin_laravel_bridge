@@ -137,5 +137,6 @@ return [
         'store_checkout_context' => (bool) env('MARKETIN_AUTOMATION_STORE_CHECKOUT_CONTEXT', true),
         'checkout_context_ttl' => (int) env('MARKETIN_AUTOMATION_CONTEXT_TTL', 60 * 24 * 2),
         'auto_queue_conversion' => (bool) env('MARKETIN_AUTOMATION_QUEUE_CONVERSION', true),
+        'auto_track_http_verification' => (bool) env('MARKETIN_AUTO_TRACK_HTTP_VERIFICATION', true),
     ],
 ];

@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Marketin\LaravelBridge\Http\Controllers\PaystackWebhookController;
 use Marketin\LaravelBridge\Http\Middleware\PersistMarketinParams;
+use Marketin\LaravelBridge\Http\Middleware\TrackPaystackVerification;
 use Marketin\LaravelBridge\Support\Automation\AttributionContextResolver;
 use Marketin\LaravelBridge\Support\Automation\PendingAttributionStore;
 use Marketin\LaravelBridge\Support\MarketinManager;
@@ -99,14 +100,23 @@ class MarketinServiceProvider extends ServiceProvider
         /** @var Router $router */
         $router = $this->app['router'];
 
-        if (! config('marketin.payments.persistence.enabled', true)) {
-            $router->aliasMiddleware('marketin.persist_params', PersistMarketinParams::class);
+        // Always register the persistence middleware alias
+        $router->aliasMiddleware('marketin.persist_params', PersistMarketinParams::class);
+        
+        // Register the Paystack verification tracking middleware
+        $router->aliasMiddleware('marketin.track_paystack', TrackPaystackVerification::class);
 
+        if (! config('marketin.payments.persistence.enabled', true)) {
             return;
         }
 
-        $router->aliasMiddleware('marketin.persist_params', PersistMarketinParams::class);
+        // Auto-add persistence to web group
         $router->pushMiddlewareToGroup('web', PersistMarketinParams::class);
+        
+        // Auto-add Paystack tracking to web group when enabled
+        if (config('marketin.automation.auto_track_http_verification', true)) {
+            $router->pushMiddlewareToGroup('web', TrackPaystackVerification::class);
+        }
     }
 
     /**

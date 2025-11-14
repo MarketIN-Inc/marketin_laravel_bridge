@@ -30,17 +30,24 @@ class SendConversionToMarketin implements ShouldQueue
     public function handle(): void
     {
         $config = config('marketin');
+        $debug = config('marketin.debug', false);
         $endpoint = rtrim(Arr::get($config, 'api_endpoint', ''), '/');
 
         if ($endpoint === '') {
-            Log::warning('Marketin conversion skipped: missing api_endpoint config', ['payload' => $this->payload]);
+            Log::warning('[Marketin] ⚠️ Conversion skipped: missing api_endpoint config. Set MARKETIN_API_ENDPOINT in your environment.', [
+                'payload' => $this->payload,
+                'hint' => 'Add MARKETIN_API_ENDPOINT=https://api.marketin.now/api/v1 to .env',
+            ]);
             return;
         }
 
         $brandId = $this->payload['brandId'] ?? null;
 
         if (! $brandId) {
-            Log::warning('Marketin conversion skipped: payload missing brandId', ['payload' => $this->payload]);
+            Log::warning('[Marketin] ⚠️ Conversion skipped: payload missing brandId', [
+                'payload' => $this->payload,
+                'hint' => 'Ensure MARKETIN_BRAND_ID is set or passed in the payload',
+            ]);
             return;
         }
 
@@ -71,8 +78,8 @@ class SendConversionToMarketin implements ShouldQueue
             $headers['X-CAMPAIGN-ID'] = (string) $campaignId;
         }
 
-        if (config('marketin.debug', false)) {
-            Log::debug('Dispatching Marketin conversion', [
+        if ($debug) {
+            Log::debug('[Marketin] 🚀 Sending conversion to API', [
                 'endpoint' => $url,
                 'headers' => $headers,
                 'body' => $body,
@@ -86,11 +93,27 @@ class SendConversionToMarketin implements ShouldQueue
             $status = $response->status();
             $message = $response->body();
 
+            Log::error('[Marketin] ❌ Failed to post conversion to API', [
+                'http_status' => $status,
+                'response_body' => $message,
+                'endpoint' => $url,
+                'payload' => $this->payload,
+                'hint' => 'Check API endpoint, network connectivity, and Marketin API status',
+            ]);
+
             throw new RuntimeException(sprintf(
                 'Failed to post conversion to Marketin API (HTTP %d): %s',
                 $status,
                 $message
             ));
+        }
+
+        if ($debug) {
+            Log::info('[Marketin] ✅ Conversion successfully sent to API', [
+                'reference' => $this->payload['orderId'] ?? $this->payload['reference'] ?? null,
+                'value' => $this->payload['value'] ?? null,
+                'http_status' => $response->status(),
+            ]);
         }
     }
 }

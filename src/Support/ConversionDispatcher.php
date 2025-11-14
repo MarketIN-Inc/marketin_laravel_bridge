@@ -21,6 +21,7 @@ class ConversionDispatcher
     public static function queue(array $payload, array $context = []): void
     {
         $config = config('marketin');
+        $debug = config('marketin.debug', false);
 
         $brandId = self::firstValue(
             $payload['brandId'] ?? null,
@@ -30,7 +31,11 @@ class ConversionDispatcher
         );
 
         if (! $brandId) {
-            Log::warning('Marketin conversion skipped: missing brandId', ['payload' => $payload, 'context' => $context]);
+            Log::warning('[Marketin] ⚠️ Conversion skipped: missing brandId. Set MARKETIN_BRAND_ID in your environment or pass brandId in the payload.', [
+                'payload' => $payload,
+                'context' => $context,
+                'hint' => 'Add MARKETIN_BRAND_ID=your-brand-id to .env',
+            ]);
             return;
         }
 
@@ -91,12 +96,46 @@ class ConversionDispatcher
 
         $job = new SendConversionToMarketin($payload, $context);
 
+        if ($debug) {
+            Log::info('[Marketin] 📦 Queuing conversion', [
+                'brandId' => $payload['brandId'],
+                'affiliateId' => $payload['affiliateId'] ?? null,
+                'campaignId' => $payload['campaignId'] ?? null,
+                'productId' => $payload['productId'] ?? null,
+                'value' => $payload['value'] ?? null,
+                'reference' => self::resolveReference($payload, $context),
+                'source' => $context['source'] ?? 'manual',
+            ]);
+        }
+
         if ($job instanceof ShouldQueue) {
+            // Check if queue is configured but warn if it might not be running
+            $connection = config('queue.default');
+            $driver = config("queue.connections.{$connection}.driver");
+            
+            if ($driver === 'sync') {
+                Log::info('[Marketin] ℹ️ Queue driver is "sync" - conversion will be sent immediately');
+            } elseif ($debug) {
+                Log::debug('[Marketin] Queue driver: ' . $driver . ' - ensure queue worker is running (php artisan queue:work)');
+            }
+
             Bus::dispatch($job);
+            
+            if ($debug) {
+                Log::info('[Marketin] ✅ Conversion dispatched to queue', [
+                    'queue' => $connection,
+                    'driver' => $driver,
+                ]);
+            }
+            
             return;
         }
 
         // Falls back to synchronous execution when queueing is disabled.
+        if ($debug) {
+            Log::info('[Marketin] 🔄 Executing conversion synchronously (job is not ShouldQueue)');
+        }
+        
         $job->handle();
     }
 
