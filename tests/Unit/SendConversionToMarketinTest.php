@@ -83,4 +83,32 @@ class SendConversionToMarketinTest extends TestCase
         $this->assertSame('purchase', Arr::get($captured, 'event'));
         $this->assertArrayNotHasKey('eventType', $captured);
     }
+
+    public function testSessionIdIsMirroredToSnakeCase(): void
+    {
+        config([
+            'marketin.api_endpoint' => 'https://api.example.test/v1',
+            'marketin.api_public_path' => '/sdk-log-conversion',
+            'marketin.debug' => false,
+        ]);
+
+        $captured = null;
+
+        Http::fake(function (Request $request) use (&$captured) {
+            $captured = $request->data();
+
+            return Http::response(['ok' => true], 200);
+        });
+
+        $job = new SendConversionToMarketin([
+            'brandId' => 55,
+            'value' => 80.25,
+            'sessionId' => 'sess-1234',
+        ]);
+
+        $job->handle();
+
+        $this->assertSame('sess-1234', Arr::get($captured, 'sessionId'));
+        $this->assertSame('sess-1234', Arr::get($captured, 'session_id'));
+    }
 }

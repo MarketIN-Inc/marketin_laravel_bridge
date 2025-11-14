@@ -163,6 +163,30 @@ class ConversionDispatcherTest extends TestCase
         });
     }
 
+    public function testSessionIdIsCapturedFromRequest(): void
+    {
+        Bus::fake();
+
+        $request = Request::create('/', 'GET');
+        $session = $this->app['session.store'];
+        $session->start();
+        $request->setLaravelSession($session);
+        $this->app->instance('request', $request);
+
+        ConversionDispatcher::queue([
+            'value' => 75.00,
+            'reference' => 'with-session',
+        ]);
+
+        $expectedSessionId = $session->getId();
+
+        Bus::assertDispatched(SendConversionToMarketin::class, function (SendConversionToMarketin $job) use ($expectedSessionId) {
+            $payload = $this->readPayload($job);
+
+            return $payload['sessionId'] === $expectedSessionId;
+        });
+    }
+
     /**
      * @param SendConversionToMarketin $job
      * @return array<string, mixed>

@@ -23,12 +23,18 @@ class AttributionContextResolver
         $request = $this->app->make('request');
         $params = MarketinParams::current($request instanceof Request ? $request : null);
         $config = config('marketin');
+        $sessionId = null;
+
+        if ($request instanceof Request && $request->hasSession()) {
+            $sessionId = $request->session()->getId();
+        }
 
         $context = array_filter([
             'affiliateId' => $overrides['affiliateId'] ?? $params->affiliateId() ?? Arr::get($config, 'affiliate_id'),
             'campaignId' => $overrides['campaignId'] ?? $params->campaignId() ?? Arr::get($config, 'campaign_id'),
             'productId' => $overrides['productId'] ?? $params->productId(),
             'brandId' => $overrides['brandId'] ?? Arr::get($config, 'brand_id'),
+            'sessionId' => $overrides['sessionId'] ?? $sessionId,
         ], fn ($value) => $value !== null && $value !== '');
 
         return $context;

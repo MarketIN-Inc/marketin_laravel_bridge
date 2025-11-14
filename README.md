@@ -37,6 +37,7 @@ Marketin Laravel Bridge is a lightweight helper that drops the Marketin JavaScri
 - Automatic Paystack instrumentation: metadata injection, webhook dispatching, and conversion queuing now run out of the box—no checkout boilerplate required.
 - Marketing identifiers always win: Paystack metadata is rewritten with the captured `pid`/`cid`/`aid`, while the original catalog product ID is preserved as `catalog_product_id` for internal bookkeeping.
 - Front-end conversions are API-ready: browser events now emit both `event` and `eventType`, defaulting to `purchase` (or the configured name) so drop-in integrations meet Marketin's API contract without custom wiring.
+- Session identifiers travel with the payload: the dispatcher forwards the Laravel `session_id` for every conversion, satisfying the Marketin API’s latest schema without host-application changes.
 - **Comprehensive logging**: When `MARKETIN_DEBUG=true`, see exactly what's happening in `laravel.log` with actionable error messages and clear success indicators.
 - Extensible helper that accepts per-render overrides for advanced pages or A/B tests.
 
@@ -228,6 +229,7 @@ With automation enabled (default), the package stitches the full Paystack flow t
 - The persisted Marketin parameters (`pid`, `cid`, `aid`) always override transaction metadata when conversions are queued. This guarantees that the marketing product ID captured from the landing URL is the same ID sent to the Marketin API, even when your checkout stores a separate catalog primary key.
 - When the package overwrites `metadata.product_id` with the marketing PID, the original catalog value is preserved as `metadata.catalog_product_id` so your application can still reconcile orders locally.
 - The `event_type` field defaults to `"purchase"` (configurable via `payments.providers.paystack.defaults.eventType` in `config/marketin.php`). The dispatcher automatically normalizes `eventType` (camelCase) to `event_type` (snake_case) before posting to the API, so your application meets the API contract without manual field mapping.
+- The Laravel session ID is captured when the conversion is queued and mirrored to both `sessionId` and `session_id` in the API request. Webhook flows reuse the cached identifier to stay aligned with browser-based automation.
 
 ```bash
 # For database queues

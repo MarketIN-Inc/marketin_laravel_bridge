@@ -72,6 +72,13 @@ class SendConversionToMarketin implements ShouldQueue
 
         unset($body['eventType']);
 
+        $sessionId = $body['sessionId'] ?? $body['session_id'] ?? Arr::get($this->context, 'sessionId') ?? Arr::get($this->context, 'session_id');
+
+        if ($sessionId !== null && $sessionId !== '') {
+            $body['sessionId'] = $sessionId;
+            $body['session_id'] = $sessionId;
+        }
+
         $headers = [
             'Accept' => 'application/json',
             'X-BRAND-ID' => (string) $brandId,

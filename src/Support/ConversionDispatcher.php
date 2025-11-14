@@ -107,6 +107,20 @@ class ConversionDispatcher
             $payload['event'] = $payload['eventType'];
         }
 
+        $sessionId = self::firstValue(
+            Arr::get($payload, 'sessionId'),
+            Arr::get($payload, 'session_id'),
+            Arr::get($context, 'sessionId'),
+            Arr::get($context, 'session_id'),
+            Arr::get($stored, 'sessionId'),
+            Arr::get($stored, 'session_id'),
+            self::requestSessionId()
+        );
+
+        if ($sessionId !== null) {
+            $payload['sessionId'] = $sessionId;
+        }
+
         $job = new SendConversionToMarketin($payload, $context);
 
         if ($debug) {
@@ -204,5 +218,22 @@ class ConversionDispatcher
         $request = request();
 
         return $request?->query($key);
+    }
+
+    protected static function requestSessionId(): ?string
+    {
+        if (! app()->bound('request')) {
+            return null;
+        }
+
+        $request = request();
+
+        if (! $request || ! $request->hasSession()) {
+            return null;
+        }
+
+        $sessionId = $request->session()->getId();
+
+        return is_string($sessionId) && $sessionId !== '' ? $sessionId : null;
     }
 }
