@@ -36,6 +36,7 @@ Marketin Laravel Bridge is a lightweight helper that drops the Marketin JavaScri
 - Drop-in conversion pipeline: attribution parameters survive gateway redirects and confirmed Paystack webhooks queue a Market!N conversion without manual wiring.
 - Automatic Paystack instrumentation: metadata injection, webhook dispatching, and conversion queuing now run out of the box—no checkout boilerplate required.
 - Marketing identifiers always win: Paystack metadata is rewritten with the captured `pid`/`cid`/`aid`, while the original catalog product ID is preserved as `catalog_product_id` for internal bookkeeping.
+- Front-end conversions are API-ready: browser events now emit both `event` and `eventType`, defaulting to `purchase` (or the configured name) so drop-in integrations meet Marketin's API contract without custom wiring.
 - **Comprehensive logging**: When `MARKETIN_DEBUG=true`, see exactly what's happening in `laravel.log` with actionable error messages and clear success indicators.
 - Extensible helper that accepts per-render overrides for advanced pages or A/B tests.
 

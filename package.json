@@ -3,9 +3,11 @@
   "version": "0.0.2",
   "private": true,
   "description": "Build tooling for the Marketin Laravel bridge assets.",
+  "type": "module",
   "scripts": {
     "dev": "vite --watch",
-    "build": "vite build"
+    "build": "vite build",
+    "test": "node --test tests/js/marketin-core.test.mjs"
   },
   "devDependencies": {
     "vite": "^5.0.0"

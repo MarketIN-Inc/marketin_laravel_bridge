@@ -83,6 +83,22 @@ const readBridgeConfig = () => {
 	return window.__marketInBridgeConfig ?? {};
 };
 
+const resolveEventName = (payload, fallback) => {
+	const eventValue = typeof payload?.event === 'string' && payload.event.trim() !== ''
+		? payload.event.trim()
+		: undefined;
+
+	if (eventValue) {
+		return eventValue;
+	}
+
+	const eventTypeValue = typeof payload?.eventType === 'string' && payload.eventType.trim() !== ''
+		? payload.eventType.trim()
+		: undefined;
+
+	return eventTypeValue || fallback;
+};
+
 const resolveBootstrapOptions = (overrides = {}) => {
 	const globalConfig = readBridgeConfig();
 	const combined = { ...globalConfig, ...overrides };
@@ -159,8 +175,11 @@ const bindMarketInEvents = () => {
 			return;
 		}
 
+		const eventName = resolveEventName(payload, 'purchase');
+
 		const conversionData = {
-			eventType: 'purchase',
+			event: eventName,
+			eventType: eventName,
 			value,
 			currency: payload?.currency || 'USD',
 			conversionRef: payload?.orderId,
@@ -192,9 +211,7 @@ const bindMarketInEvents = () => {
 		const affiliateId = parseNumericId(payload?.affiliateId) ?? parseNumericId(storedParams?.aid);
 		const campaignId = parseNumericId(payload?.campaignId) ?? parseNumericId(storedParams?.cid);
 		const productId = payload?.productId ?? storedParams?.pid ?? storedParams?.productId;
-		const eventType = typeof payload.eventType === 'string' && payload.eventType.trim() !== ''
-		? payload.eventType.trim()
-		: 'subscription.created';
+		const eventName = resolveEventName(payload, 'subscription.created');
 
 		if (affiliateId !== undefined) {
 			payload.affiliateId = affiliateId;
@@ -208,7 +225,8 @@ const bindMarketInEvents = () => {
 			payload.productId = productId;
 		}
 
-		payload.eventType = eventType;
+		payload.event = eventName;
+		payload.eventType = eventName;
 
 		logEvent('Subscription detail (mapped)', payload);
 		window.MarketIn?.trackConversion?.(payload);
