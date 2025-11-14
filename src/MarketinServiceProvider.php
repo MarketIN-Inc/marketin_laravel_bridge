@@ -2,15 +2,18 @@
 
 namespace Marketin\LaravelBridge;
 
+use Illuminate\Http\Client\Events\ResponseReceived;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Marketin\LaravelBridge\Http\Controllers\PaystackWebhookController;
 use Marketin\LaravelBridge\Http\Middleware\PersistMarketinParams;
 use Marketin\LaravelBridge\Http\Middleware\TrackPaystackVerification;
 use Marketin\LaravelBridge\Support\Automation\AttributionContextResolver;
+use Marketin\LaravelBridge\Support\Automation\PaystackHttpResponseTracker;
 use Marketin\LaravelBridge\Support\Automation\PendingAttributionStore;
 use Marketin\LaravelBridge\Support\MarketinManager;
 
@@ -31,6 +34,10 @@ class MarketinServiceProvider extends ServiceProvider
             return new PendingAttributionStore($app->make('cache.store'));
         });
 
+        $this->app->singleton(PaystackHttpResponseTracker::class, function ($app) {
+            return new PaystackHttpResponseTracker();
+        });
+
         $this->app->singleton('marketin.manager', function ($app) {
             return new MarketinManager(
                 $app,
@@ -48,6 +55,7 @@ class MarketinServiceProvider extends ServiceProvider
         $this->registerPublishing();
         $this->registerDirectives();
         $this->registerMiddleware();
+        $this->registerHttpClientListeners();
         $this->registerRoutes();
         $this->bootAutomation();
     }
@@ -117,6 +125,21 @@ class MarketinServiceProvider extends ServiceProvider
         if (config('marketin.automation.auto_track_http_verification', true)) {
             $router->pushMiddlewareToGroup('web', TrackPaystackVerification::class);
         }
+    }
+
+    protected function registerHttpClientListeners(): void
+    {
+        if (! config('marketin.automation.enabled', true)) {
+            return;
+        }
+
+        if (! config('marketin.automation.auto_track_http_verification', true)) {
+            return;
+        }
+
+        Event::listen(ResponseReceived::class, function (ResponseReceived $event) {
+            $this->app->make(PaystackHttpResponseTracker::class)->handle($event);
+        });
     }
 
     /**

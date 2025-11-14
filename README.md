@@ -32,7 +32,7 @@ Marketin Laravel Bridge is a lightweight helper that drops the Marketin JavaScri
 - CDN defaults for both the SDK (`https://cdn.jsdelivr.net/gh/MarketIN-Inc/sdk@latest/marketin-sdk.min.js`) and the bridge bundle—no publishing step required.
 - Environment-driven configuration so each deployment can set the required brand identifier (with optional fallbacks).
 - Optional `@marketinTracking` directive to push structured events into the data layer you already use.
-- **Automatic conversion tracking**: Middleware intercepts Paystack verification responses and queues conversions automatically—no code changes required.
+- **Automatic conversion tracking**: The package listens to Paystack verification responses emitted by Laravel's HTTP client and queues conversions automatically—no code changes required. A middleware fallback is included for teams that proxy the raw JSON directly to the browser.
 - Drop-in conversion pipeline: attribution parameters survive gateway redirects and confirmed Paystack webhooks queue a Market!N conversion without manual wiring.
 - Automatic Paystack instrumentation: metadata injection, webhook dispatching, and conversion queuing now run out of the box—no checkout boilerplate required.
 - **Comprehensive logging**: When `MARKETIN_DEBUG=true`, see exactly what's happening in `laravel.log` with actionable error messages and clear success indicators.
@@ -243,18 +243,19 @@ if ($response->successful() && $response->json('data.status') === 'success') {
 }
 ```
 
-**No additional code needed!** The package automatically:
-- Detects the successful Paystack verification response
-- Extracts the transaction data
-- Queues a conversion with all captured attribution parameters
-- Logs everything when `MARKETIN_DEBUG=true`
+**No additional code needed!** As long as you verify with Laravel's HTTP client (`Http::get`/`post`/etc.), the bridge automatically:
+- Listens to the Paystack verification response **before** your controller renders a view
+- Extracts the transaction data regardless of whether you return JSON, a Blade view, or a redirect
+- Queues a conversion with the captured attribution parameters
+- Logs every step when `MARKETIN_DEBUG=true` (including reasons a response was skipped)
 
-Check `storage/logs/laravel.log` to see:
+Check `storage/logs/laravel.log` to see messages such as:
 ```
 [Marketin] 📦 Queuing conversion
 [Marketin] ✅ Conversion dispatched to queue
 [Marketin] 🚀 Sending conversion to API
 [Marketin] ✅ Conversion successfully sent to API
+[Marketin] Skipping Paystack auto-track: verification response was not JSON (when applicable)
 ```
 
 #### SDK-based Paystack integration
@@ -278,7 +279,7 @@ $paystack = Paystack::transaction()->initialize([
 
 #### Manual tracking (optional)
 
-If you need an immediate confirmation step or want to disable automatic tracking, call the facade helper manually:
+If you need an immediate confirmation step, use a non-Laravel HTTP client, or prefer to disable automatic tracking, call the facade helper manually:
 
 ```php
 use Marketin\LaravelBridge\Facades\Marketin;
@@ -295,7 +296,7 @@ if ($response->successful()) {
 }
 ```
 
-To disable automatic HTTP tracking:
+To disable automatic HTTP tracking (for example, when you handle verification through a bespoke HTTP client or webhook job):
 
 ```env
 MARKETIN_AUTO_TRACK_HTTP_VERIFICATION=false

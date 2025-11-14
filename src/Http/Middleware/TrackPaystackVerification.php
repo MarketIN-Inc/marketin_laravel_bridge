@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Marketin\LaravelBridge\Facades\Marketin;
+use Marketin\LaravelBridge\Support\Automation\ConversionTrackerState;
 use Symfony\Component\HttpFoundation\Response;
 
 class TrackPaystackVerification
@@ -39,11 +40,19 @@ class TrackPaystackVerification
         $content = $response->getContent();
 
         if (! $content || ! is_string($content)) {
+            $this->info('Skipping Paystack auto-track middleware: response content empty or not string', [
+                'url' => $request->fullUrl(),
+            ]);
+
             return $response;
         }
 
         // Check if this looks like a Paystack verification response
         if (! $this->looksLikePaystackVerification($content)) {
+            $this->debug('Skipping Paystack auto-track middleware: response does not look like Paystack verification JSON', [
+                'url' => $request->fullUrl(),
+            ]);
+
             return $response;
         }
 
@@ -52,9 +61,16 @@ class TrackPaystackVerification
 
             if ($this->isSuccessfulPaystackResponse($data)) {
                 $this->trackConversion($data, $request);
+            } else {
+                $this->debug('Skipping Paystack auto-track middleware: verification JSON missing success flag', [
+                    'url' => $request->fullUrl(),
+                ]);
             }
         } catch (\JsonException $e) {
             // Not JSON, ignore silently
+            $this->debug('Skipping Paystack auto-track middleware: response was not valid JSON', [
+                'url' => $request->fullUrl(),
+            ]);
         }
 
         return $response;
@@ -100,9 +116,18 @@ class TrackPaystackVerification
     protected function trackConversion(array $data, Request $request): void
     {
         $transaction = $data['data'] ?? [];
+        $reference = $transaction['reference'] ?? null;
+
+        if (ConversionTrackerState::hasTracked(is_string($reference) ? $reference : null)) {
+            $this->debug('Skipping Paystack auto-track middleware: reference already tracked this request', [
+                'reference' => $reference,
+            ]);
+
+            return;
+        }
 
         if (config('marketin.debug', false)) {
-            Log::debug('[Marketin] Auto-detected Paystack verification success, queuing conversion', [
+            Log::debug('[Marketin] Auto-detected Paystack verification success via middleware, queuing conversion', [
                 'reference' => $transaction['reference'] ?? null,
                 'amount' => $transaction['amount'] ?? null,
                 'url' => $request->fullUrl(),
@@ -111,6 +136,7 @@ class TrackPaystackVerification
 
         try {
             Marketin::trackAfterPayment($transaction);
+            ConversionTrackerState::remember(is_string($reference) ? $reference : null);
 
             if (config('marketin.debug', false)) {
                 Log::info('[Marketin] ✅ Conversion queued automatically from Paystack verification', [
@@ -123,5 +149,19 @@ class TrackPaystackVerification
                 'reference' => $transaction['reference'] ?? null,
             ]);
         }
+    }
+
+    protected function info(string $message, array $context = []): void
+    {
+        Log::info('[Marketin] '.$message, $context);
+    }
+
+    protected function debug(string $message, array $context = []): void
+    {
+        if (! config('marketin.debug', false)) {
+            return;
+        }
+
+        Log::debug('[Marketin] '.$message, $context);
     }
 }

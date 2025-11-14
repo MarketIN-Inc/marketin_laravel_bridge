@@ -5,10 +5,10 @@ namespace Marketin\LaravelBridge\Tests\Unit;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Bus;
-use Illuminate\Support\Facades\Log;
 use Marketin\LaravelBridge\Http\Middleware\TrackPaystackVerification;
 use Marketin\LaravelBridge\Jobs\SendConversionToMarketin;
 use Marketin\LaravelBridge\MarketinServiceProvider;
+use Marketin\LaravelBridge\Support\Automation\ConversionTrackerState;
 use Orchestra\Testbench\TestCase;
 
 class TrackPaystackVerificationTest extends TestCase
@@ -28,6 +28,13 @@ class TrackPaystackVerificationTest extends TestCase
             'marketin.automation.auto_track_http_verification' => true,
             'marketin.debug' => false,
         ]);
+    }
+
+    protected function tearDown(): void
+    {
+        ConversionTrackerState::flush();
+
+        parent::tearDown();
     }
 
     public function testMiddlewareIgnoresNonPaystackResponses(): void
