@@ -80,6 +80,7 @@ class SendConversionToMarketinTest extends TestCase
         $job->handle();
 
         $this->assertSame('purchase', Arr::get($captured, 'event_type'));
+        $this->assertSame('purchase', Arr::get($captured, 'event'));
         $this->assertArrayNotHasKey('eventType', $captured);
     }
 }

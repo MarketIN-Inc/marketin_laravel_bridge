@@ -133,7 +133,8 @@ class ConversionDispatcherTest extends TestCase
         Bus::assertDispatched(SendConversionToMarketin::class, function (SendConversionToMarketin $job) {
             $payload = $this->readPayload($job);
 
-            return $payload['eventType'] === 'purchase';
+            return $payload['eventType'] === 'purchase'
+                && $payload['event'] === 'purchase';
         });
     }
 
@@ -157,7 +158,8 @@ class ConversionDispatcherTest extends TestCase
         Bus::assertDispatched(SendConversionToMarketin::class, function (SendConversionToMarketin $job) {
             $payload = $this->readPayload($job);
 
-            return $payload['eventType'] === 'subscription';
+            return $payload['eventType'] === 'subscription'
+                && $payload['event'] === 'subscription';
         });
     }
 

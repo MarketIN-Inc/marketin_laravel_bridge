@@ -103,6 +103,10 @@ class ConversionDispatcher
             'purchase'
         );
 
+        if (! isset($payload['event']) || $payload['event'] === null || $payload['event'] === '') {
+            $payload['event'] = $payload['eventType'];
+        }
+
         $job = new SendConversionToMarketin($payload, $context);
 
         if ($debug) {

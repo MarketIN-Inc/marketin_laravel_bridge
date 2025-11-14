@@ -62,11 +62,15 @@ class SendConversionToMarketin implements ShouldQueue
         // Flatten the payload: Django expects all fields at root level, not nested under 'conversion'
         $body = $this->payload;
 
-        // Normalize eventType to snake_case for API compliance
-        if (isset($body['eventType']) && ! isset($body['event_type'])) {
-            $body['event_type'] = $body['eventType'];
-            unset($body['eventType']);
+        // Normalize event/eventType fields for API compliance
+        $eventType = $body['eventType'] ?? $body['event_type'] ?? $body['event'] ?? null;
+
+        if ($eventType !== null && $eventType !== '') {
+            $body['event_type'] = $eventType;
+            $body['event'] = $eventType;
         }
+
+        unset($body['eventType']);
 
         $headers = [
             'Accept' => 'application/json',
