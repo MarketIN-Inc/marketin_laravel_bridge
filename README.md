@@ -1,479 +1,247 @@
 # Marketin Laravel Bridge
 
-Marketin Laravel Bridge is a lightweight helper that drops the Marketin JavaScript SDK and a self-initialising bridge script into any Laravel application. A single Blade directive renders the SDK, injects a configuration blob, and loads the bridge that wires URL attribution, Livewire events, and conversion tracking.
+A lightweight, automation‑ready integration layer that brings Marketin tracking, attribution persistence, and Paystack conversion automation to any Laravel application. This package injects the Marketin JavaScript SDK, listens to Paystack verification responses, manages attribution data, and queues conversions that follow Marketin’s latest API schema.
+
+This README (Option B) includes fully detailed sections, explanations, and integration steps for both beginners and advanced Laravel developers.
 
 ---
 
-## Table of contents
+## Table of Contents
 
-1. [Features](#features)
-2. [Requirements](#requirements)
-3. [Quick start](#quick-start)
-4. [Installation](#installation)
-   - [1. Install the package](#1-install-the-package)
-   - [2. Configure environment variables](#2-configure-environment-variables)
-   - [3. Add the Blade directive](#3-add-the-blade-directive)
-5. [Configuration](#configuration)
-   - [Environment variables](#environment-variables)
-   - [Bridge hosting](#bridge-hosting)
-6. [Usage](#usage)
-   - [Blade directives](#blade-directives)
-   - [Sample layout integration](#sample-layout-integration)
-   - [Tracking data-layer snippet](#tracking-data-layer-snippet)
-7. [Self-hosting the bridge (optional)](#self-hosting-the-bridge-optional)
-8. [Support](#support)
+1. Features
+2. Requirements
+3. Installation
+4. Environment Setup
+5. Blade Directives
+6. Layout Integration (Full Example)
+7. Paystack Flow & Automatic Conversion Tracking
+8. Attribution Persistence
+9. Configuration Reference
+10. Conversion Queueing & Session Alignment
+11. Troubleshooting
+12. Support
 
 ---
 
-## Features
+## 1. Features
 
-- **True drop-in integration**: Works with standard Laravel patterns—no SDK dependency required. The package automatically detects Paystack verifications made via `Http::post()` and queues conversions without manual calls.
-- One-line Blade directive (`@marketinScripts`) that loads the official Marketin SDK and passes a signed config payload to the bridge.
-- CDN defaults for both the SDK (`https://cdn.jsdelivr.net/gh/MarketIN-Inc/sdk@latest/marketin-sdk.min.js`) and the bridge bundle—no publishing step required.
-- Environment-driven configuration so each deployment can set the required brand identifier (with optional fallbacks).
-- Optional `@marketinTracking` directive to push structured events into the data layer you already use.
-- **Automatic conversion tracking**: The package listens to Paystack verification responses emitted by Laravel's HTTP client and queues conversions automatically—no code changes required. A middleware fallback is included for teams that proxy the raw JSON directly to the browser.
-- Drop-in conversion pipeline: attribution parameters survive gateway redirects and confirmed Paystack webhooks queue a Market!N conversion without manual wiring.
-- Automatic Paystack instrumentation: metadata injection, webhook dispatching, and conversion queuing now run out of the box—no checkout boilerplate required.
-- Marketing identifiers always win: Paystack metadata is rewritten with the captured `pid`/`cid`/`aid`, while the original catalog product ID is preserved as `catalog_product_id` for internal bookkeeping.
-- Front-end conversions are API-ready: browser events now emit both `event` and `eventType`, defaulting to `purchase` (or the configured name) so drop-in integrations meet Marketin's API contract without custom wiring.
-- Session identifiers travel with the payload: the dispatcher forwards the Laravel `session_id` for every conversion, satisfying the Marketin API’s latest schema without host-application changes.
-- **Comprehensive logging**: When `MARKETIN_DEBUG=true`, see exactly what's happening in `laravel.log` with actionable error messages and clear success indicators.
-- Extensible helper that accepts per-render overrides for advanced pages or A/B tests.
-
-## Requirements
-
-| Dependency | Version |
-|------------|---------|
-| PHP        | 8.2+    |
-| Laravel    | 10.x, 11.x, or 12.x |
-| Node.js    | 18+ (only for maintainers rebuilding the bundle) |
-| NPM        | 9+ (only for maintainers rebuilding the bundle) |
+- **Zero‑config SDK injection** – `@marketinScripts()` loads the official Marketin SDK + bridge bundle.
+- **Automatic Paystack tracking** – Detects verification responses from Laravel’s HTTP client and queues conversions.
+- **Attribution persistence** – `pid`, `cid`, `aid` follow users through pages, checkout redirects, and webhooks.
+- **Session alignment** – every conversion includes your Laravel `session_id`.
+- **Event normalization** – ensures `event` and `event_type` match Marketin API requirements.
+- **No boilerplate tracking code** – controllers remain clean; no manual posting required.
+- **Powerful logging** – `MARKETIN_DEBUG=true` prints detailed logs for each tracking decision.
 
 ---
 
-## Quick start
+## 2. Requirements
 
-```bash
-composer require marketin-inc/marketin-laravel-bridge
-
-# In your base layout <head> tag:
-@marketinScripts()
-
-# In your base layout <main> tag
-@marketinTracking([
-    'event' => 'marketin.page_view',
-])
-
-# Enable the Paystack webhook
-MARKETIN_PAYSTACK_ENABLED=true
-PAYSTACK_WEBHOOK_SECRET=your-paystack-secret
-QUEUE_CONNECTION=database # or redis / sqs / etc.
-# (Optional) disable automation if you prefer manual control
-# MARKETIN_AUTOMATION_ENABLED=false
-```
-
-Set `MARKETIN_BRAND_ID` in your environment before deploying. Affiliate, campaign, and product identifiers arrive via URL parameters when Marketin hands off traffic and are persisted automatically for later requests.
-
-Once the queue connection is set, run a worker (`php artisan queue:work`) so conversion jobs can post to the Marketin API.
+- PHP 8.2+
+- Laravel 10.x, 11.x, or 12.x
+- Queue worker (`database`, `redis`, `sqs`, or `sync`)
+- Paystack integration using Laravel’s HTTP client
 
 ---
 
-## Installation
-
-### 1. Install the package
+## 3. Installation
 
 ```bash
 composer require marketin-inc/marketin-laravel-bridge
 ```
 
-The service provider is auto-discovered; no manual registration is necessary.
+The package auto‑discovers its service provider.
 
-### 2. Configure environment variables
+---
 
-Add the IDs Marketin assigned to you. The bridge will refuse to initialise if `MARKETIN_BRAND_ID` is missing.
+## 4. Environment Setup
+
+Add the minimum configuration:
 
 ```dotenv
-MARKETIN_BRAND_ID=123
+MARKETIN_BRAND_ID=your-brand-id
 MARKETIN_API_ENDPOINT=https://api.marketin.now/api/v1
+MARKETIN_PAYSTACK_ENABLED=true
+MARKETIN_DEBUG=true   # optional, helpful during testing
 ```
 
-You can leave the campaign or affiliate values blank if you plan to provide them per-page via the directive.
+Run a queue worker:
 
-### 3. Add the Blade directive
-
-Place `@marketinScripts()` once in your primary layout (typically inside `<head>`). The directive renders:
-
-1. The Marketin SDK tag (`https://cdn.jsdelivr.net/gh/MarketIN-Inc/sdk@latest/marketin-sdk.min.js`) with the required `data-navigate-once` attribute and `defer` so the bridge never races the SDK.
-2. A configuration blob (`window.__marketInBridgeConfig`).
-3. The Marketin bridge bundle.
-
-When `MARKETIN_DEBUG=true`, the bridge prints a "✅ MarketIn SDK initialized" message once the SDK is available and surfaces warnings if the SDK fails to load in time. That makes layout or CDN issues immediately visible during integration.
+```bash
+php artisan queue:work
+```
 
 ---
 
-## Configuration
+## 5. Blade Directives
 
-The package ships with `config/marketin.php`. You do not need to publish it unless you prefer a file-based override; environment variables are sufficient for most teams.
+### `@marketinScripts()`
 
-### Environment variables
+Loads:
 
-| Variable                        | Default                                                          | Description |
-|---------------------------------|------------------------------------------------------------------|-------------|
-| `MARKETIN_SDK_URL`              | `https://cdn.jsdelivr.net/gh/MarketIN-Inc/sdk@latest/marketin-sdk.min.js` | CDN location of the Marketin SDK. |
-| `MARKETIN_BRAND_ID`             | `null`                                                           | **Required.** Your Marketin brand identifier. |
-| `MARKETIN_CAMPAIGN_ID`          | `null`                                                           | Optional fallback campaign identifier; typical traffic supplies `cid` via URL. |
-| `MARKETIN_AFFILIATE_ID`         | `null`                                                           | Optional fallback affiliate/advocate identifier; typical traffic supplies `aid` via URL. |
-| `MARKETIN_DEFAULT_CAMPAIGN_ID`  | `null`                                                           | Secondary campaign fallback when neither URL parameters nor overrides are provided. |
-| `MARKETIN_DEFAULT_AFFILIATE_ID` | `null`                                                           | Secondary affiliate fallback when neither URL parameters nor overrides are provided. |
-| `MARKETIN_API_ENDPOINT`         | `https://api.marketin.now/api/v1`                                | REST endpoint consumed by the bridge. |
-| `MARKETIN_API_PUBLIC_PATH`      | `/sdk-log-conversion`                                            | Public path appended to `MARKETIN_API_ENDPOINT` for conversion posts. |
-| `MARKETIN_API_TOKEN`            | `null`                                                           | Optional bearer token when you point the bridge at a protected endpoint. |
-| `MARKETIN_DEBUG`                | `false`                                                          | Enables verbose console logging. |
-| `MARKETIN_BRIDGE_URL`           | `https://cdn.jsdelivr.net/gh/MarketIN-Inc/marketin_laravel_bridge@latest/dist/marketin-bridge.js` | CDN location of the Laravel bridge bundle. |
-| `MARKETIN_ASSET_PATH`           | `vendor/marketin`                                                | Target path if you choose to self-host the bridge. |
-| `MARKETIN_BRIDGE_FILENAME`      | `marketin-bridge.js`                                             | Filename used when self-hosting. |
-| `MARKETIN_TRACKING_ENABLED`     | `true`                                                           | Toggles the `@marketinTracking` directive output. |
-| `MARKETIN_TRACKING_LAYER`       | `dataLayer`                                                      | Window variable that receives tracking events. |
-| `MARKETIN_AUTOMATION_ENABLED`   | `true`                                                           | Master switch for the automation layer (Paystack metadata, dispatcher fallbacks). |
-| `MARKETIN_AUTOMATION_ATTACH_PAYSTACK_METADATA` | `true`                                           | Toggle automatic metadata injection on Paystack initialisation. |
-| `MARKETIN_AUTOMATION_STORE_CHECKOUT_CONTEXT`   | `true`                                           | Persist attribution context against Paystack references for webhook recovery. |
-| `MARKETIN_AUTOMATION_CONTEXT_TTL` | `2880`                                                        | Minutes to retain checkout context (default 48h). |
-| `MARKETIN_AUTOMATION_QUEUE_CONVERSION` | `true`                                                   | Allow `Marketin::trackAfterPayment()` to queue conversions automatically. |
-| `MARKETIN_AUTO_TRACK_HTTP_VERIFICATION` | `true`                                                  | Auto-detect and track Paystack verifications made via `Http::post()`. Set to `false` to disable automatic tracking and use manual `Marketin::trackAfterPayment()` calls instead. |
-| `MARKETIN_PAYSTACK_ENABLED`     | `false`                                                          | When true, registers the Paystack webhook route. |
-| `PAYSTACK_WEBHOOK_SECRET`       | `null`                                                           | Secret used to validate Paystack webhook signatures. |
-| `MARKETIN_DEFAULT_EVENT_TYPE`   | `purchase`                                                       | Default event type for conversions when not explicitly provided. Configurable via `payments.providers.paystack.defaults.eventType` in `config/marketin.php`. |
+- Marketin SDK
+- Marketin bridge bundle
+- configuration payload
 
-### Bridge hosting
-
-By default the directive loads the bridge from the CDN value in `MARKETIN_BRIDGE_URL`. If you prefer to host the file yourself, set `MARKETIN_BRIDGE_URL` to an empty string (or remove it) and follow the [self-hosting instructions](#self-hosting-the-bridge-optional).
+**Placement:** inside `<head>`.
 
 ---
 
-## Usage
+### `@marketinAutoTrack()`
 
-### Automation helper
+Forces automation for the current request. It **prints no HTML**.
 
-Automation loads itself when `MARKETIN_AUTOMATION_ENABLED` (default `true`). Teams that toggle it off globally can opt back in per request or environment with a single call:
+Automation includes:
 
-```php
-use Marketin\LaravelBridge\Facades\Marketin;
+- Paystack metadata injection
+- HTTP verification listener
+- webhook-context recovery
+- conversion auto‑queueing
 
-Marketin::enableAutomation();
-```
+**Placement:** Place immediately **after **`` in your base layout.
 
-### Blade directives
+---
 
-| Directive             | Purpose |
-|-----------------------|---------|
-| `@marketinScripts()`  | Injects the SDK, configuration blob, and bridge script. Accepts an optional associative array of overrides. |
-| `@marketinTracking()` | Pushes an event into the configured data layer. Also accepts overrides. |
-| `@marketinAutoTrack`  | Ensures automation is enabled for the current request (no output; typically unnecessary because it is on by default). |
+### `@marketinTracking()`
 
-```blade
-@marketinScripts(['brandId' => 42, 'campaignId' => 1001])
-@marketinTracking(['event' => 'marketin.conversion', 'value' => 99.95, 'currency' => 'USD'])
-```
+Pushes structured tracking events to your tracking layer.
 
-### Sample layout integration
+**Placement:** bottom of `<body>`.
+
+---
+
+## 6. Layout Integration (Full Example)
 
 ```blade
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="utf-8">
-    <title>{{ config('app.name') }}</title>
-
-    @marketinScripts([
-        'productId' => request('pid'),
-        'campaignId' => request('cid'),
-        'affiliateId' => request('aid'),
-    ])
+    @marketinScripts()
 </head>
 <body>
+    @marketinAutoTrack()
+
     {{ $slot ?? '' }}
+
     @marketinTracking([
         'event' => 'marketin.page_view',
         'productId' => request('pid'),
-        'campaignId' => request('cid'),
-        'affiliateId' => request('aid'),
     ])
 </body>
 </html>
 ```
 
-### Tracking data-layer snippet
+This ensures automation + SDK loading on every page.
 
-Place `@marketinTracking()` near the bottom of your layout if you want every page view sent to your analytics layer. You can also emit it ad-hoc inside campaign pages.
+---
 
-```blade
-@marketinTracking([
-    'event' => 'marketin.page_view',
-    'brandId' => config('marketin.brand_id'),
-])
-```
+## 7. Paystack Flow & Automatic Conversion Tracking
 
-### Conversion tracking (automation-first)
+You **must keep your Paystack verification logic**. The bridge listens to the verification response and queues conversions.
 
-With automation enabled (default), the package stitches the full Paystack flow together:
-
-1. The persistence middleware (`marketin.persist_params`) captures `aid`, `cid`, and `pid` from landing URLs and stores them in the session plus an encrypted cookie.
-2. **Automatic HTTP-based tracking** (new): When you verify a Paystack transaction using `Http::post('https://api.paystack.co/transaction/verify/...')`, the package automatically detects the successful response and queues a conversion—no manual `Marketin::trackAfterPayment()` call required. This works out of the box for the most common Laravel integration pattern.
-3. **SDK-based decoration**: If your app uses Paystack's PHP SDK (e.g., `Paystack::initialize()`), the package decorates the service to inject Marketin identifiers into `metadata` automatically and caches the attribution context against the Paystack reference.
-4. **Webhook support**: The package registers `POST /marketin/paystack/webhook` for you; the controller verifies signatures, normalizes payloads according to `config/marketin.php`, and forwards them to `ConversionDispatcher`. Missing IDs are recovered from the cached context, the active request, or persisted cookies.
-5. **Job queue**: `ConversionDispatcher` queues `SendConversionToMarketin`, which posts the conversion to the Marketin API using the SDK-compatible public endpoint (`/sdk-log-conversion/`) and the required `X-BRAND-ID` header. A queue worker is recommended, but the job falls back to synchronous execution when queues are disabled.
-
-**Identifier precedence**
-
-- The persisted Marketin parameters (`pid`, `cid`, `aid`) always override transaction metadata when conversions are queued. This guarantees that the marketing product ID captured from the landing URL is the same ID sent to the Marketin API, even when your checkout stores a separate catalog primary key.
-- When the package overwrites `metadata.product_id` with the marketing PID, the original catalog value is preserved as `metadata.catalog_product_id` so your application can still reconcile orders locally.
-- The `event_type` field defaults to `"purchase"` (configurable via `payments.providers.paystack.defaults.eventType` in `config/marketin.php`). The dispatcher automatically normalizes `eventType` (camelCase) to `event_type` (snake_case) before posting to the API, so your application meets the API contract without manual field mapping.
-- The Laravel session ID is captured when the conversion is queued and mirrored to both `sessionId` and `session_id` in the API request. Webhook flows reuse the cached identifier to stay aligned with browser-based automation.
-
-```bash
-# For database queues
-php artisan queue:table
-php artisan migrate
-php artisan queue:work
-```
-
-#### HTTP-based Paystack integration (most common)
-
-If your application verifies Paystack transactions using Laravel's HTTP client (the most common pattern):
+Your usual code:
 
 ```php
-use Illuminate\Support\Facades\Http;
-
-// Your typical verification code
 $response = Http::withToken(config('paystack.secret_key'))
     ->get("https://api.paystack.co/transaction/verify/{$reference}");
 
 if ($response->successful() && $response->json('data.status') === 'success') {
-    // Process the order...
+    // Your order processing logic
 }
 ```
 
-**No additional code needed!** As long as you verify with Laravel's HTTP client (`Http::get`/`post`/etc.), the bridge automatically:
-- Listens to the Paystack verification response **before** your controller renders a view
-- Extracts the transaction data regardless of whether you return JSON, a Blade view, or a redirect
-- Queues a conversion with the captured attribution parameters
-- Logs every step when `MARKETIN_DEBUG=true` (including reasons a response was skipped)
-
-Check `storage/logs/laravel.log` to see messages such as:
-```
-[Marketin] 📦 Queuing conversion
-[Marketin] ✅ Conversion dispatched to queue
-[Marketin] 🚀 Sending conversion to API
-[Marketin] ✅ Conversion successfully sent to API
-[Marketin] Skipping Paystack auto-track: verification response was not JSON (when applicable)
-```
-
-When `MARKETIN_DEBUG=true`, the queued payload will include `eventType: "purchase"` (or your configured default), and the sent payload will show `event_type: "purchase"` after normalization.
-
-#### SDK-based Paystack integration
-
-If you use Paystack's PHP SDK, the package decorates it automatically:
-
-#### SDK-based Paystack integration
-
-If you use Paystack's PHP SDK, the package decorates it automatically:
-
-```php
-use Paystack;
-
-$paystack = Paystack::transaction()->initialize([
-    'amount' => 50000,
-    'email' => $customer->email,
-    'reference' => $reference,
-]);
-// Marketin attribution is automatically injected into metadata
-```
-
-#### Manual tracking (optional)
-
-If you need an immediate confirmation step, use a non-Laravel HTTP client, or prefer to disable automatic tracking, call the facade helper manually:
-
-```php
-use Marketin\LaravelBridge\Facades\Marketin;
-
-// After verifying a Paystack transaction
-$response = Http::withToken(config('paystack.secret_key'))
-    ->get("https://api.paystack.co/transaction/verify/{$reference}");
-
-if ($response->successful()) {
-    $transaction = $response->json('data');
-    
-    // Manually track the conversion
-    Marketin::trackAfterPayment($transaction);
-}
-```
-
-To disable automatic HTTP tracking (for example, when you handle verification through a bespoke HTTP client or webhook job):
-
-```env
-MARKETIN_AUTO_TRACK_HTTP_VERIFICATION=false
-```
-
-The helper extracts `amount`, `currency`, `reference`, and `metadata` from the Paystack object/array, fills any gaps via cached context, and forwards everything to the conversion queue. Pass an overrides array as the second argument when you need to tweak values.
-
-### Attribution persistence
-
-When a visitor lands on a Marketin link such as:
-
-```text
-https://example.com/product/101?pid=101&cid=3&aid=8
-```
-
-- `aid` → `affiliateId` / `advocateId`
-- `cid` → `campaignId`
-- `pid` → `productId` (consumed when `marketin:conversion` events fire)
-
-The persistence middleware stores these identifiers in the session (when available) and an encrypted, HTTP-only cookie. Every request merges the current query string, persisted values, and any overrides so Paystack return URLs or subsequent page loads still contain complete attribution data. The Blade bridge continues to populate `window.sessionStorage`, ensuring client-side events and Livewire transitions re-use the same identifiers.
-
-When automation is active, the same attribution snapshot is cached against the Paystack transaction reference during checkout initialisation. Webhooks, queued jobs, and `Marketin::trackAfterPayment()` all read from that cache first, so conversions retain the original affiliate/campaign identifiers even if the gateway omits them from the callback payload.
-
-The Marketin platform issues customer-facing links containing these parameters, so most teams leave campaign and affiliate IDs blank in their configuration. Overrides exist purely as an escape hatch for bespoke flows or testing.
-
-#### Custom query parameter names
-
-If you receive different query parameter names (for example `affiliate` instead of `aid`), normalise them before the directive runs so the bridge can still discover them. A lightweight middleware keeps the logic centralised:
-
-```php
-<?php
-
-namespace App\Http\Middleware;
-
-use Closure;
-
-class NormalizeMarketinParams
-{
-    public function handle($request, Closure $next)
-    {
-        $mapping = [
-            'affiliate' => 'aid',
-            'campaign' => 'cid',
-            'product' => 'pid',
-        ];
-
-        foreach ($mapping as $incoming => $expected) {
-            if ($request->query->has($incoming) && ! $request->query->has($expected)) {
-                $request->query->set($expected, $request->query($incoming));
-            }
-        }
-
-        return $next($request);
-    }
-}
-```
-
-Register the middleware in `app/Http/Kernel.php` (for example inside the `web` group) so every request presents the expected keys to the bridge. For a one-off page you can also pass overrides directly to the directive:
-
-```blade
-@marketinScripts([
-    'affiliateId' => request('affiliate'),
-    'campaignId' => request('campaign'),
-    'defaultCampaignId' => config('marketin.default_campaign_id'),
-])
-```
-
-The bridge still honours the precedence list above, so explicit overrides win whenever the canonical query parameters are missing.
-
-#### Product conversion example
-
-Here is a minimal product page that relies entirely on URL-provided identifiers. The `data-marketin-conversion` attribute emits a conversion payload, while the stored `pid` becomes the product identifier sent to Marketin.
-
-```blade
-@extends('layouts.app')
-
-@section('content')
-    <main class="product">
-        <header>
-            <h1>{{ $product->name }}</h1>
-            <p class="price">${{ number_format($product->price, 2) }}</p>
-        </header>
-
-        <button
-            type="button"
-            class="btn btn-primary"
-            data-marketin-conversion='{"value": {{ number_format($product->price, 2, '.', '') }}, "currency": "USD"}'
-            data-marketin-product-id="{{ $product->id }}"
-        >
-            Purchase
-        </button>
-    </main>
-@endsection
-```
-
-When a visitor lands on a Marketin link such as `https://example.com/product/101?pid=101&cid=3&aid=8`, the bridge attaches the `pid`, `cid`, and `aid` captured from the URL to the conversion event fired when the button is pressed. If you omit `data-marketin-product-id`, the stored `pid` automatically becomes the product identifier.
+**Do not manually track conversions.**\
+The package detects the verification response and queues the conversion.
 
 ---
 
-## Self-hosting the bridge (optional)
+## 8. Attribution Persistence
 
-If corporate policy requires hosting the bridge script yourself, run the publish command once and clear the CDN override:
+The package captures `pid`, `cid`, `aid` from URLs like:
 
-```bash
-php artisan vendor:publish --tag=marketin-assets
-# then set MARKETIN_BRIDGE_URL= in your .env file
+```
+?pid=10&cid=3&aid=8
 ```
 
-The file will be copied to `public/vendor/marketin/marketin-bridge.js`. Future package updates may ship a newer bundle; rerun the command after upgrading.
+Attribution is persisted via:
 
-> **Note:** Only teams that self-host need to run `php artisan vendor:publish --tag=marketin-assets`. CDN users can skip this step entirely.
+- Laravel session
+- encrypted cookies
+- checkout‑context caching (per Paystack reference)
+
+Precedence:
+
+1. URL parameters
+2. session/cookie
+3. cached Paystack reference context
+4. fallback config values
 
 ---
 
-## Troubleshooting
+## 9. Configuration Reference
 
-### Conversions aren't being tracked
+Common environment variables:
 
-1. **Enable debug logging** to see what's happening:
-   ```env
-   MARKETIN_DEBUG=true
-   ```
+| Variable                                | Description                                  |
+| --------------------------------------- | -------------------------------------------- |
+| `MARKETIN_BRAND_ID`                     | Required brand identifier                    |
+| `MARKETIN_API_ENDPOINT`                 | Marketin API root                            |
+| `MARKETIN_PAYSTACK_ENABLED`             | Enables webhook route                        |
+| `MARKETIN_AUTO_TRACK_HTTP_VERIFICATION` | Enables auto‑detection of Paystack responses |
+| `MARKETIN_DEFAULT_EVENT_TYPE`           | Default event type (e.g., purchase)          |
+| `MARKETIN_DEBUG`                        | Verbose logs                                 |
 
-2. **Check `storage/logs/laravel.log`** for Marketin messages:
-   - `📦 Queuing conversion` - Conversion was queued successfully
-   - `⚠️ Conversion skipped: missing brandId` - Set `MARKETIN_BRAND_ID` in `.env`
-   - `✅ Conversion successfully sent to API` - Everything worked!
-
-3. **Verify queue is running**:
-   ```bash
-   php artisan queue:work
-   ```
-   
-   If you see `Queue driver is "sync"` in logs, conversions run immediately. For production, use `database`, `redis`, or `sqs`.
-
-4. **Check middleware is active**:
-   ```bash
-   php artisan route:list --middleware=marketin
-   ```
-
-5. **Verify Paystack response format**: The automatic tracker looks for successful verification responses. Make sure your code gets a `200` response with `status: true` and `data.status: "success"`.
-
-### No logs appear
-
-- Ensure `MARKETIN_DEBUG=true` is set
-- Check `config/marketin.php` hasn't been published with debug disabled
-- Verify Laravel logging is working: `Log::info('test')` should appear in `laravel.log`
-
-### Conversions tracked multiple times
-
-If you're calling `Marketin::trackAfterPayment()` manually AND have automatic tracking enabled, you might see duplicates. Choose one approach:
-
-```env
-# For automatic tracking (recommended)
-MARKETIN_AUTO_TRACK_HTTP_VERIFICATION=true
-
-# For manual tracking only
-MARKETIN_AUTO_TRACK_HTTP_VERIFICATION=false
-```
+You rarely need to publish `config/marketin.php`.
 
 ---
 
-## Support
+## 10. Conversion Queueing & Session Alignment
 
-- Documentation issues or feature requests: open an issue in the Marketin Laravel Bridge repository.
-- SDK behaviour questions: contact the Marketin SDK team or your Marketin solutions engineer.
-- Production incidents: escalate through your Marketin account manager.
+When Paystack verification succeeds:
+
+- attribution IDs are resolved
+- event + event\_type are normalized
+- session\_id is attached
+- a conversion job is queued: `SendConversionToMarketin`
+
+The job posts conversions to the API and logs success or failures.
+
+---
+
+## 11. Troubleshooting
+
+### Conversions not appearing
+
+- Ensure `@marketinAutoTrack()` is in your layout.
+- Run a queue worker.
+- Check `laravel.log` for Marketin messages.
+
+### Duplicate conversions
+
+- Ensure you are **not** manually calling a Marketin tracking function.
+
+### Missing brand ID
+
+Set:
+
+```dotenv
+MARKETIN_BRAND_ID=your-brand-id
+```
+
+### Paystack auto‑track skipped
+
+Enable:
+
+```dotenv
+MARKETIN_DEBUG=true
+```
+
+Check logs for precise skip reasons.
+
+---
+
+## 12. Support
+
+- Open an issue in this repository.
+- Contact your Marketin solutions engineer for integration or production assistance.
+
